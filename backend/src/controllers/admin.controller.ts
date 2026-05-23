@@ -10,7 +10,9 @@ import {
   getTopLenders,
   getAdminStats,
   getDashboardData,
+  updateListingApprovalStatus,
 } from "../services/admin.service";
+import { createNotification } from "../services/notification.service";
 
 export const getUsers = async (req: Request, res: Response) => {
   try {
@@ -29,6 +31,70 @@ export const getListings = async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Error fetching admin listings:", error);
     res.status(500).json({ message: "Failed to fetch admin listings" });
+  }
+};
+
+export const approveListing = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const itemId = Array.isArray(id) ? id[0] : id;
+
+    if (!itemId) {
+      res.status(400).json({ message: "Invalid listing id" });
+      return;
+    }
+
+    const listing = await updateListingApprovalStatus(itemId, "approved");
+    if (!listing) {
+      res.status(404).json({ message: "Listing not found" });
+      return;
+    }
+
+    await createNotification({
+      userId: listing.ownerId,
+      type: "listing_approved",
+      title: "Listing Approved",
+      message: `Your listing \"${listing.title}\" has been approved and published.`,
+      referenceId: listing._id?.toString(),
+      referenceType: "item",
+    });
+
+    res.status(200).json(listing);
+  } catch (error) {
+    console.error("Error approving listing:", error);
+    res.status(500).json({ message: "Failed to approve listing" });
+  }
+};
+
+export const rejectListing = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const itemId = Array.isArray(id) ? id[0] : id;
+
+    if (!itemId) {
+      res.status(400).json({ message: "Invalid listing id" });
+      return;
+    }
+
+    const listing = await updateListingApprovalStatus(itemId, "rejected");
+    if (!listing) {
+      res.status(404).json({ message: "Listing not found" });
+      return;
+    }
+
+    await createNotification({
+      userId: listing.ownerId,
+      type: "listing_rejected",
+      title: "Listing Rejected",
+      message: `Your listing \"${listing.title}\" was not approved for publication. Please revise the details and resubmit it.`,
+      referenceId: listing._id?.toString(),
+      referenceType: "item",
+    });
+
+    res.status(200).json(listing);
+  } catch (error) {
+    console.error("Error rejecting listing:", error);
+    res.status(500).json({ message: "Failed to reject listing" });
   }
 };
 

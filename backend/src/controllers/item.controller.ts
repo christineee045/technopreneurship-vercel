@@ -8,6 +8,7 @@ import {
   updateItem,
   deleteItem,
 } from "../services/item.service";
+import { createNotification } from "../services/notification.service";
 
 export const createItemHandler = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -22,6 +23,7 @@ export const createItemHandler = async (req: Request, res: Response): Promise<vo
        ownerId: user.id,
        ownerName: user.name,
        ownerAvatar: user.avatar,
+      approvalStatus: "pending",
      };
 
     if (!itemData.title || !itemData.description || !itemData.category || !itemData.condition) {
@@ -30,6 +32,20 @@ export const createItemHandler = async (req: Request, res: Response): Promise<vo
     }
 
     const item = await createItem(itemData);
+
+    try {
+      await createNotification({
+        userId: user.id,
+        type: "listing_submitted",
+        title: "Listing Submitted for Review",
+        message: `Your listing \"${item.title}\" has been submitted for administrative review and will be published once approved.`,
+        referenceId: item._id?.toString(),
+        referenceType: "item",
+      });
+    } catch (notificationError) {
+      console.error("Failed to create listing submission notification:", notificationError);
+    }
+
     res.status(201).json(item);
   } catch (error) {
     res.status(500).json({ message: "Failed to create item", error });

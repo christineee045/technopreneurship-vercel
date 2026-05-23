@@ -18,9 +18,11 @@ import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
 import {
   fetchUserProfile,
+  fetchBorrowerFeedbackByBorrowerId,
   type User,
   type Item,
   type Review,
+  type BorrowerFeedback,
 } from "../services/api";
 
 export default function UserProfile() {
@@ -29,7 +31,8 @@ export default function UserProfile() {
   const { user: currentUser } = useAuth();
   const [profileUser, setProfileUser] = useState<User | null>(null);
   const [items, setItems] = useState<Item[]>([]);
-  const [reviews, setReviews] = useState<Review[]>([]);
+  const [lenderReviews, setLenderReviews] = useState<Review[]>([]);
+  const [borrowerFeedback, setBorrowerFeedback] = useState<BorrowerFeedback[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -37,10 +40,14 @@ export default function UserProfile() {
       if (!userId) return;
       try {
         setIsLoading(true);
-        const data = await fetchUserProfile(userId);
+        const [data, publicBorrowerFeedback] = await Promise.all([
+          fetchUserProfile(userId),
+          fetchBorrowerFeedbackByBorrowerId(userId),
+        ]);
         setProfileUser(data.user);
         setItems(data.items);
-        setReviews(data.reviews);
+        setLenderReviews(data.reviews);
+        setBorrowerFeedback(publicBorrowerFeedback);
       } catch (error) {
         console.error("Failed to load profile:", error);
         toast.error("Failed to load profile");
@@ -81,6 +88,9 @@ export default function UserProfile() {
   }
 
   const isOwnProfile = currentUser?.id === profileUser.id || currentUser?._id === profileUser._id;
+  const borrowerFeedbackAverage = borrowerFeedback.length === 0
+    ? 0
+    : Number((borrowerFeedback.reduce((sum, feedback) => sum + (feedback.borrowerRating || 0), 0) / borrowerFeedback.length).toFixed(1));
 
   return (
     <div className="min-h-screen bg-background">
@@ -119,11 +129,12 @@ export default function UserProfile() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="gap-1">
+                      <Badge variant="outline" className="gap-1" title="Lender rating from item reviews">
                         <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                        {profileUser.rating.toFixed(1)} rating
+                        {profileUser.rating.toFixed(1)} lender rating
                       </Badge>
-                      <Badge variant="outline">{profileUser.reviewCount} reviews</Badge>
+                      <Badge variant="outline">{profileUser.reviewCount} lender reviews</Badge>
+                      <Badge variant="outline">{borrowerFeedback.length} borrower feedback</Badge>
                     </div>
                   </div>
                   {isOwnProfile && (
@@ -192,17 +203,17 @@ export default function UserProfile() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Star className="h-5 w-5" />
-                  Reviews ({reviews.length})
+                  Lender Reviews ({lenderReviews.length})
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {reviews.length === 0 ? (
+                {lenderReviews.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-8">
                     No reviews yet.
                   </p>
                 ) : (
                   <div className="space-y-4">
-                    {reviews.map((review) => (
+                    {lenderReviews.map((review) => (
                       <div key={review.id || review._id} className="border-b pb-4 last:border-0">
                         <div className="flex items-start justify-between gap-3 mb-2">
                           <div>
@@ -229,6 +240,47 @@ export default function UserProfile() {
               </CardContent>
             </Card>
 
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5" />
+                  Borrower Feedback ({borrowerFeedback.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {borrowerFeedback.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    No borrower feedback yet.
+                  </p>
+                ) : (
+                  <div className="space-y-4">
+                    {borrowerFeedback.map((feedback, index) => (
+                      <div key={feedback.id || `${feedback.itemId}-${index}`} className="border-b pb-4 last:border-0">
+                        <div className="flex items-start justify-between gap-3 mb-2">
+                          <div>
+                            <p className="font-semibold text-sm">{feedback.ownerName}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {format(new Date(feedback.createdAt), "PPP")}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1 text-sm font-medium">
+                            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                            {feedback.borrowerRating ?? "N/A"}
+                          </div>
+                        </div>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                          {feedback.borrowerFeedback || "No written feedback."}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          for "{feedback.itemTitle}" · {feedback.status}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Trust Indicators */}
             <Card>
               <CardHeader>
@@ -239,13 +291,13 @@ export default function UserProfile() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm">Response Rate</span>
+                  <span className="text-sm">Borrower Trust</span>
                   <span className="text-sm font-semibold">
-                    {profileUser.reviewCount > 0 ? "95%" : "N/A"}
+                    {borrowerFeedback.length > 0 ? `${borrowerFeedbackAverage.toFixed(1)}/5` : "N/A"}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm">Item Return Rate</span>
+                  <span className="text-sm">Lender Trust</span>
                   <span className="text-sm font-semibold">
                     {profileUser.rating >= 4.5 ? "Excellent" : profileUser.rating >= 3.5 ? "Good" : "Needs Improvement"}
                   </span>

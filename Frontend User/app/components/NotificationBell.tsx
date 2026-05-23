@@ -12,12 +12,48 @@ import { useNotifications } from '../context/NotificationContext';
 import { formatDistanceToNow } from 'date-fns';
 import { updateBorrowRequest } from '../services/api';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router';
+
+const buildNotificationTarget = (notification: {
+  type: string;
+  referenceId?: string;
+  referenceType?: string;
+}) => {
+  switch (notification.type) {
+    case 'borrow_request_submitted':
+      return '/dashboard?tab=my-requests';
+    case 'borrow_request':
+      return '/dashboard?tab=incoming';
+    case 'request_approved':
+    case 'request_rejected':
+    case 'item_returned':
+      return '/dashboard?tab=my-requests';
+    case 'listing_submitted':
+    case 'listing_rejected':
+      return '/dashboard?tab=my-items';
+    case 'listing_approved':
+      return notification.referenceId ? `/item/${notification.referenceId}` : '/';
+    case 'new_review':
+      return '/account?tab=reviews';
+    default:
+      if (notification.referenceType === 'borrowRequest') {
+        return '/dashboard?tab=my-requests';
+      }
+      if (notification.referenceType === 'item' && notification.referenceId) {
+        return `/item/${notification.referenceId}`;
+      }
+      return '/dashboard';
+  }
+};
 
 export function NotificationBell() {
+  const navigate = useNavigate();
   const { notifications, unreadCount, markAsRead, markAllAsRead, fetchNotifications } = useNotifications();
 
-  const handleNotificationClick = async (id: string) => {
-    await markAsRead(id);
+  const handleNotificationClick = async (notification: { id: string; type: string; referenceId?: string; referenceType?: string }) => {
+    const target = buildNotificationTarget(notification);
+    await markAsRead(notification.id);
+    navigate(target);
   };
 
   const handleApproveRequest = async (e: React.MouseEvent, requestId: string, notifId: string) => {
@@ -87,7 +123,7 @@ export function NotificationBell() {
                 {notifications.map((notification, index) => (
                   <div key={notification.id} className="group">
                     <button
-                      onClick={() => handleNotificationClick(notification.id)}
+                      onClick={() => handleNotificationClick(notification)}
                       className={`w-full text-left p-3 rounded-lg transition-colors ${
                         !notification.read
                           ? 'bg-primary/10 hover:bg-primary/20'

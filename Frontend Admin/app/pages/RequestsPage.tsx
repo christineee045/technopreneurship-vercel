@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { Search, CheckCircle, XCircle, Eye, MoreVertical } from "lucide-react";
+import { Search, Eye, Info } from "lucide-react";
 import { AdminHeader } from "../components/AdminHeader";
 import { AdminSidebar } from "../components/AdminSidebar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
@@ -53,21 +53,6 @@ export default function RequestsPage() {
     });
   }, [requests, searchQuery, statusFilter]);
 
-  const handleApprove = (requestId: string) => {
-    setRequests(requests.map((r) => (r.id === requestId ? { ...r, status: "Approved" } : r)));
-    toast.success("Request approved!");
-  };
-
-  const handleReject = (requestId: string) => {
-    setRequests(requests.filter((r) => r.id !== requestId));
-    toast.error("Request rejected");
-  };
-
-  const handleMarkActive = (requestId: string) => {
-    setRequests(requests.map((r) => (r.id === requestId ? { ...r, status: "Active" } : r)));
-    toast.success("Request marked as active");
-  };
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case "Pending":
@@ -104,12 +89,24 @@ export default function RequestsPage() {
           {/* Header */}
           <div className="mb-8 animate-fade-in">
             <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-orange-400 to-orange-500 bg-clip-text text-transparent">
-              Borrow Requests
+              Borrow Request Oversight
             </h1>
             <p className="text-muted-foreground mt-2">
-              Manage and process all borrowing requests
+              Borrowers and item owners handle approvals here; admin monitors escalations, overdue cases, and support needs.
             </p>
           </div>
+
+          <Card className="border-2 mb-6 bg-muted/30">
+            <CardContent className="p-4 flex items-start gap-3">
+              <Info className="h-5 w-5 mt-0.5 text-primary" />
+              <div className="space-y-1">
+                <p className="font-medium">Admin role on this page</p>
+                <p className="text-sm text-muted-foreground">
+                  Borrow request approval belongs to the item owner. Use this page to audit request volume, review edge cases, and step in when disputes or overdue returns need intervention.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Stats Cards */}
           <div className="grid grid-cols-5 gap-4 mb-8">
@@ -222,33 +219,6 @@ export default function RequestsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    {request.status === "Pending" && (
-                      <>
-                        <Button
-                          className="w-full bg-green-600 hover:bg-green-700"
-                          onClick={() => handleApprove(request.id)}
-                        >
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          Approve
-                        </Button>
-                        <Button
-                          variant="outline"
-                          className="w-full text-destructive"
-                          onClick={() => handleReject(request.id)}
-                        >
-                          <XCircle className="h-4 w-4 mr-2" />
-                          Reject
-                        </Button>
-                      </>
-                    )}
-                    {request.status === "Approved" && (
-                      <Button
-                        className="w-full bg-blue-600 hover:bg-blue-700"
-                        onClick={() => handleMarkActive(request.id)}
-                      >
-                        Mark as Active
-                      </Button>
-                    )}
                     <Button
                       variant="outline"
                       className="w-full"
@@ -267,7 +237,7 @@ export default function RequestsPage() {
             <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Borrow Request Details</DialogTitle>
-                <DialogDescription>Full request context for admin review</DialogDescription>
+                <DialogDescription>Full request context for admin oversight and escalation support</DialogDescription>
               </DialogHeader>
               {selectedRequest && (
                 <div className="flex flex-row gap-6">

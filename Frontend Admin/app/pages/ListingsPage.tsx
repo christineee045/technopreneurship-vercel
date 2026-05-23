@@ -27,7 +27,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../components/ui/dialog";
-import { fetchAdminListings, type AdminListing } from "../services/admin-api";
+import { approveAdminListing, fetchAdminListings, rejectAdminListing, type AdminListing } from "../services/admin-api";
 import { toast } from "sonner";
 
 const FEATURED_OVERRIDES_KEY = "lendlyFeaturedOverrides";
@@ -94,9 +94,38 @@ export default function ListingsPage() {
     });
   }, [listings, searchQuery, statusFilter]);
 
-  const handleApprove = (listingId: string, title: string) => {
-    setListings(listings.map((l) => (l.id === listingId ? { ...l, status: "active" } : l)));
-    toast.success(`Listing "${title}" has been approved`);
+  const normalizeListingStatus = (status?: string) => {
+    if (status === "approved" || status === "pending" || status === "rejected") {
+      return status;
+    }
+    return "pending";
+  };
+
+  const formatListingStatusLabel = (status?: string) => {
+    const normalizedStatus = normalizeListingStatus(status);
+    return normalizedStatus === "pending"
+      ? "Pending Review"
+      : normalizedStatus.charAt(0).toUpperCase() + normalizedStatus.slice(1);
+  };
+
+  const handleApprove = async (listingId: string, title: string) => {
+    try {
+      const updated = await approveAdminListing(listingId);
+      setListings(listings.map((l) => (l.id === listingId ? { ...l, status: updated.status } : l)));
+      toast.success(`Listing "${title}" has been approved for publication`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to approve listing");
+    }
+  };
+
+  const handleReject = async (listingId: string, title: string) => {
+    try {
+      const updated = await rejectAdminListing(listingId);
+      setListings(listings.map((l) => (l.id === listingId ? { ...l, status: updated.status } : l)));
+      toast.info(`Listing "${title}" has been rejected`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to reject listing");
+    }
   };
 
   const handleMarkFeatured = (listingId: string, title: string, isFeatured: boolean) => {
@@ -112,12 +141,12 @@ export default function ListingsPage() {
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case "active":
+    switch (normalizeListingStatus(status)) {
+      case "approved":
         return "bg-green-100 text-green-800 border-green-200";
       case "pending":
         return "bg-yellow-100 text-yellow-800 border-yellow-200";
-      case "flagged":
+      case "rejected":
         return "bg-red-100 text-red-800 border-red-200";
       default:
         return "bg-gray-100 text-gray-800 border-gray-200";
@@ -146,7 +175,7 @@ export default function ListingsPage() {
               Listings Management
             </h1>
             <p className="text-muted-foreground mt-2">
-              Review, approve, and manage all platform listings
+              Review listings before they are published to the platform
             </p>
           </div>
 
@@ -154,9 +183,9 @@ export default function ListingsPage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
             {[
               { label: "Total Listings", value: listings.length, color: "from-blue-500 to-blue-600" },
-              { label: "Active", value: listings.filter((l) => l.status === "active").length, color: "from-green-500 to-green-600" },
-              { label: "Pending", value: listings.filter((l) => l.status === "pending").length, color: "from-yellow-500 to-yellow-600" },
-              { label: "Featured", value: listings.filter((l) => l.featured).length, color: "from-purple-500 to-purple-600" },
+              { label: "Approved", value: listings.filter((l) => l.status === "approved").length, color: "from-green-500 to-green-600" },
+              { label: "Pending Review", value: listings.filter((l) => l.status === "pending").length, color: "from-yellow-500 to-yellow-600" },
+              { label: "Rejected", value: listings.filter((l) => l.status === "rejected").length, color: "from-red-500 to-red-600" },
             ].map((stat, idx) => (
               <div key={idx} className={`p-4 rounded-lg bg-gradient-to-r ${stat.color} text-white shadow-lg hover:shadow-xl transition-all hover:scale-105`}>
                 <p className="text-sm opacity-90">{stat.label}</p>
@@ -182,7 +211,7 @@ export default function ListingsPage() {
                   />
                 </div>
                 <div className="flex gap-2 flex-wrap">
-                  {["all", "active", "pending", "flagged"].map((status) => (
+                  {['all', 'approved', 'pending', 'rejected'].map((status) => (
                     <Button
                       key={status}
                       variant={statusFilter === status ? "default" : "outline"}
@@ -218,7 +247,7 @@ export default function ListingsPage() {
                     </div>
                   )}
                   <Badge className={`absolute top-2 left-2 ${getStatusColor(listing.status)}`}>
-                    {listing.status.charAt(0).toUpperCase() + listing.status.slice(1)}
+                    {formatListingStatusLabel(listing.status)}
                   </Badge>
                 </div>
 
@@ -285,7 +314,12 @@ export default function ListingsPage() {
                       <DropdownMenuContent align="end">
                         {listing.status === "pending" && (
                           <DropdownMenuItem onClick={() => handleApprove(listing.id, listing.title)} className="text-green-600">
-                            ✓ Approve Listing
+                            ✓ Approve for Publication
+                          </DropdownMenuItem>
+                        )}
+                        {listing.status === "pending" && (
+                          <DropdownMenuItem onClick={() => handleReject(listing.id, listing.title)} className="text-destructive">
+                            ✕ Reject Listing
                           </DropdownMenuItem>
                         )}
                         <DropdownMenuItem onClick={() => handleMarkFeatured(listing.id, listing.title, listing.featured)}>
@@ -385,7 +419,7 @@ export default function ListingsPage() {
                     <div className="rounded-lg border p-3">
                       <p className="text-xs text-muted-foreground">Status</p>
                       <Badge className={getStatusColor(selectedListing.status)}>
-                        {selectedListing.status.charAt(0).toUpperCase() + selectedListing.status.slice(1)}
+                        {formatListingStatusLabel(selectedListing.status)}
                       </Badge>
                     </div>
                     <div className="rounded-lg border p-3">

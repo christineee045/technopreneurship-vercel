@@ -10,6 +10,8 @@ import {
   getTopLendersController,
   getStats,
   getDashboard,
+  approveListing,
+  rejectListing,
 } from "../controllers/admin.controller";
 import { authenticateToken, requireAdmin } from "../middleware/auth";
 
@@ -19,6 +21,8 @@ router.use(authenticateToken, requireAdmin);
 
 router.get("/users", getUsers);
 router.get("/listings", getListings);
+router.post("/listings/:id/approve", approveListing);
+router.post("/listings/:id/reject", rejectListing);
 router.get("/borrow-requests", getBorrowRequests);
 router.get("/overdue-items", getOverdueItems);
 router.get("/disputes", getDisputes);

@@ -1,7 +1,8 @@
 import type { Request, Response } from "express";
 import Item from "../models/Item";
 import BorrowRequest from "../models/BorrowRequest";
-import { createReview, getReviewsByItemId, getReviewsByOwnerId } from "../services/review.service";
+import User from "../models/User";
+import { createReview, getReviewsByItemId, getReviewsByOwnerId, getReviewsByReviewerId, replyToReview, deleteReview } from "../services/review.service";
 
 export const createReviewHandler = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -37,11 +38,14 @@ export const createReviewHandler = async (req: Request, res: Response): Promise<
       return;
     }
 
+    const currentUser = await User.findById(user.id).select("avatar").lean();
+
     const review = await createReview({
       itemId: item.id,
       itemTitle: item.title,
       reviewerId: user.id,
       reviewerName: user.name,
+      reviewerAvatar: currentUser?.avatar,
       ownerId: item.ownerId,
       ownerName: item.ownerName,
       rating: Number(rating),
@@ -96,5 +100,85 @@ export const getReviewsByOwnerIdHandler = async (req: Request, res: Response): P
     res.json(reviews);
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch reviews", error });
+  }
+};
+
+export const getReviewsByReviewerIdHandler = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { reviewerId } = req.params;
+    const resolvedReviewerId = Array.isArray(reviewerId) ? reviewerId[0] : reviewerId;
+
+    if (!resolvedReviewerId) {
+      res.status(400).json({ message: "Invalid reviewer id" });
+      return;
+    }
+
+    const reviews = await getReviewsByReviewerId(resolvedReviewerId);
+    res.json(reviews);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch reviews", error });
+  }
+};
+
+export const replyToReviewHandler = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const user = (req as any).user;
+    if (!user?.id) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const { reviewId } = req.params;
+    const resolvedReviewId = Array.isArray(reviewId) ? reviewId[0] : reviewId;
+    const { content, ownerReply } = req.body;
+    const replyContent = typeof content === "string" ? content : ownerReply;
+
+    if (!resolvedReviewId || !replyContent?.trim()) {
+      res.status(400).json({ message: "reviewId and content are required" });
+      return;
+    }
+
+    const currentUser = await User.findById(user.id).select("avatar name").lean();
+    const updatedReview = await replyToReview(resolvedReviewId, {
+      id: user.id,
+      name: currentUser?.name || user.name,
+      avatar: currentUser?.avatar,
+    }, replyContent);
+    if (!updatedReview) {
+      res.status(404).json({ message: "Review not found" });
+      return;
+    }
+
+    res.json(updatedReview);
+  } catch (error) {
+    if (error instanceof Error && error.message === "You cannot reply to your own review") {
+      res.status(403).json({ message: error.message });
+      return;
+    }
+    res.status(500).json({ message: "Failed to reply to review", error });
+  }
+};
+
+export const deleteReviewHandler = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { reviewId } = req.params;
+    const resolvedReviewId = Array.isArray(reviewId) ? reviewId[0] : reviewId;
+
+    if (!resolvedReviewId) {
+      res.status(400).json({ message: "reviewId is required" });
+      return;
+    }
+
+    const success = await deleteReview(resolvedReviewId);
+
+    if (!success) {
+      res.status(404).json({ message: "Review not found" });
+      return;
+    }
+
+    res.json({ message: "Review deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting review:", error);
+    res.status(500).json({ message: "Failed to delete review", error: error instanceof Error ? error.message : "Unknown error" });
   }
 };

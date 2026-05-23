@@ -99,13 +99,20 @@ export const getAdminListings = async () => {
       deposit: item.deposit,
       dailyRate: item.rentalFeePerDay,
       image: item.images[0] || "",
-      status: item.available ? "active" : "pending",
+      status: item.approvalStatus || "approved",
       featured: item.isFeatured || false,
       createdDate: item.createdAt,
       borrowCount,
       rating: item.ownerRating,
     };
   });
+};
+
+export const updateListingApprovalStatus = async (
+  itemId: string,
+  approvalStatus: 'pending' | 'approved' | 'rejected'
+) => {
+  return Item.findByIdAndUpdate(itemId, { approvalStatus }, { new: true });
 };
 
 export const getAdminBorrowRequests = async () => {
@@ -171,25 +178,27 @@ export const getAdminOverdueItems = async () => {
 export const getAdminDisputes = async () => {
   const requests = await BorrowRequest.find();
 
-  return requests.slice(0, 2).map((request: any, index: number) => {
-    const severity = index === 0 ? "High" : "Medium";
+  return requests
+    .filter((request: any) => request.status === "Reported" || request.reportReason)
+    .map((request: any, index: number) => {
+    const severity = request.reportReason?.toLowerCase().includes("damage") ? "High" : index === 0 ? "High" : "Medium";
     return {
       id: `D-${request._id.toString()}`,
-      title: index === 0 ? "Item Returned Damaged" : "Late Return Without Communication",
+      title: request.reportReason || (index === 0 ? "Item Returned Damaged" : "Late Return Without Communication"),
       itemTitle: request.itemTitle,
       reporter: request.ownerName,
       reporterId: request.ownerId,
       defendant: request.borrowerName,
       defendantId: request.borrowerId,
       reportDate: request.createdAt,
-      status: index === 0 ? "Open" : "In Progress",
+      status: request.status === "Reported" ? "Open" : "In Progress",
       severity,
-      description: index === 0
+      description: request.reportReason || (index === 0
         ? "Reported damage on return. Awaiting verification."
-        : "Borrower has not responded to return reminders.",
-      adminNotes: "",
+        : "Borrower has not responded to return reminders."),
+      adminNotes: request.borrowerFeedback || "",
     };
-  });
+    });
 };
 
 export const getCategoryStats = async () => {
@@ -260,7 +269,7 @@ export const getDashboardData = async () => {
   const returnedThisWeek = requests.filter((req) => req.status === "Returned").length;
   const totalBorrowVolume = requests.length;
   const overdueItems = requests.filter((req) => req.status === "Overdue").length;
-  const disputes = Math.min(2, requests.length);
+  const disputes = requests.filter((req) => req.status === "Reported" || req.reportReason).length;
   const newUsersThisWeek = Math.min(12, totalUsers);
 
   const stats = {
@@ -329,7 +338,7 @@ export const getAdminStats = async () => {
   const returnedThisWeek = requests.filter((req) => req.status === "Returned").length;
   const totalBorrowVolume = requests.length;
   const overdueItems = requests.filter((req) => req.status === "Overdue").length;
-  const disputes = Math.min(2, requests.length);
+  const disputes = requests.filter((req) => req.status === "Reported" || req.reportReason).length;
   const newUsersThisWeek = Math.min(12, totalUsers);
 
   return {

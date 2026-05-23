@@ -10,39 +10,35 @@ import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
 import { Badge } from '../components/ui/badge';
 import { AvatarCropModal } from '../components/AvatarCropModal';
 import { fetchItems, updateUserProfile, type Item } from '../services/api';
-import { fetchReviewsByOwnerId, type Review } from '../services/api';
 import { Calendar, MapPin, Star, Package, Edit, Loader2, Camera } from 'lucide-react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 
 export default function Account() {
   const { user, setUser } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState(user?.name || '');
   const [avatar, setAvatar] = useState(user?.avatar || '');
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [userListings, setUserListings] = useState<Item[]>([]);
-  const [userReviews, setUserReviews] = useState<Review[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [showCropModal, setShowCropModal] = useState(false);
   const [selectedImageForCrop, setSelectedImageForCrop] = useState<string>('');
+  const [activeTab, setActiveTab] = useState('profile');
 
   useEffect(() => {
     const loadUserListings = async () => {
       try {
         setIsLoading(true);
-        const [allItems, reviews] = await Promise.all([
-          fetchItems(),
-          user?.id ? fetchReviewsByOwnerId(user.id) : Promise.resolve([]),
-        ]);
+        const allItems = await fetchItems();
         // Filter items by owner ID
         const userItems = allItems.filter(item => item.ownerId === user?.id);
         setUserListings(userItems);
-        setUserReviews(reviews);
       } catch (error) {
         console.error("Failed to fetch user listings:", error);
         toast.error("Failed to load listings");
@@ -65,6 +61,13 @@ export default function Account() {
       setName(user.name);
     }
   }, [user?.avatar, user?.name]);
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'profile' || tab === 'listings') {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
 
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -171,11 +174,10 @@ export default function Account() {
         <div className="max-w-5xl mx-auto">
           <h1 className="text-3xl font-semibold mb-8">Account Settings</h1>
 
-          <Tabs defaultValue="profile" className="space-y-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <TabsList>
               <TabsTrigger value="profile">Profile</TabsTrigger>
               <TabsTrigger value="listings">My Listings</TabsTrigger>
-              <TabsTrigger value="reviews">Reviews</TabsTrigger>
             </TabsList>
 
             <TabsContent value="profile" className="space-y-6">
@@ -403,46 +405,6 @@ export default function Account() {
                               </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="reviews" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Recent Reviews</CardTitle>
-                  <CardDescription>
-                    Feedback left by borrowers on your listings
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {userReviews.length === 0 ? (
-                    <div className="text-center py-12">
-                      <Star className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                      <h3 className="text-lg font-semibold mb-2">No reviews yet</h3>
-                      <p className="text-muted-foreground">
-                        Reviews will appear here after people borrow and rate your items.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="grid gap-4">
-                      {userReviews.map((review) => (
-                        <div key={review.id || review._id} className="rounded-lg border p-4 space-y-2">
-                          <div className="flex items-center justify-between gap-3">
-                            <div>
-                              <p className="font-medium">{review.reviewerName}</p>
-                              <p className="text-xs text-muted-foreground">For {review.itemTitle}</p>
-                            </div>
-                            <div className="flex items-center gap-1 text-sm font-medium">
-                              <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                              {review.rating}
-                            </div>
-                          </div>
-                          <p className="text-sm text-muted-foreground">{review.comment}</p>
                         </div>
                       ))}
                     </div>

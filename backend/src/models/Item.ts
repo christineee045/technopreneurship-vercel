@@ -15,6 +15,7 @@ export interface IItem extends Document {
   location: string;
   available: boolean;
   isFeatured?: boolean;
+  approvalStatus?: "pending" | "approved" | "rejected";
   createdAt: Date;
   updatedAt: Date;
 }
@@ -79,6 +80,11 @@ const itemSchema = new Schema<IItem>(
     isFeatured: {
       type: Boolean,
       default: false,
+    },
+    approvalStatus: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      default: "pending",
     },
   },
   {

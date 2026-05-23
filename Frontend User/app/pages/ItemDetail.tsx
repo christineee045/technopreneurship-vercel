@@ -10,7 +10,6 @@ import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
 import { Calendar } from "../components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { 
   MapPin, 
   Star, 
@@ -44,6 +43,7 @@ export default function ItemDetail() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [isRequesting, setIsRequesting] = useState(false);
   const [reviewRating, setReviewRating] = useState(5);
+  const [reviewRatingHover, setReviewRatingHover] = useState(0);
   const [reviewComment, setReviewComment] = useState("");
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   
@@ -194,12 +194,14 @@ export default function ItemDetail() {
       setItem(prev => (prev ? { ...prev, ownerRating: result.ownerRating } : prev));
       setReviewComment("");
       setReviewRating(5);
+      setReviewRatingHover(0);
       toast.success("Review submitted successfully");
       addNotification({
         title: "Review submitted",
         message: `You reviewed ${item.ownerName}.`,
         read: false,
       });
+      navigate(`/item/${item.id || item._id || ""}/reviews#review-${result.review.id}`);
     } catch (error) {
       const messageText = error instanceof Error ? error.message : "Failed to submit review";
       toast.error(messageText);
@@ -214,6 +216,8 @@ export default function ItemDetail() {
     'Good': 'bg-yellow-100 text-yellow-800 border-yellow-200',
     'Fair': 'bg-orange-100 text-orange-800 border-orange-200',
   };
+
+  const reviewPreview = reviews.slice(0, 3);
 
   return (
     <div className="min-h-screen bg-background">
@@ -303,7 +307,19 @@ export default function ItemDetail() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Reviews</CardTitle>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <CardTitle className="text-base">Reviews</CardTitle>
+                    <p className="text-xs text-muted-foreground mt-1">{reviews.length} review{reviews.length === 1 ? "" : "s"}</p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigate(`/item/${item.id || item._id || ""}/reviews`)}
+                  >
+                    See all reviews
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between rounded-lg border p-3">
@@ -322,19 +338,28 @@ export default function ItemDetail() {
 
                 <div className="space-y-3">
                   <Label htmlFor="review-comment">Leave a review</Label>
-                  <div className="grid gap-3 sm:grid-cols-[140px_1fr]">
-                    <Select value={reviewRating.toString()} onValueChange={(value) => setReviewRating(Number(value))}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Rating" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="5">5 stars</SelectItem>
-                        <SelectItem value="4">4 stars</SelectItem>
-                        <SelectItem value="3">3 stars</SelectItem>
-                        <SelectItem value="2">2 stars</SelectItem>
-                        <SelectItem value="1">1 star</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="grid gap-3 sm:grid-cols-[180px_1fr]">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-1" onMouseLeave={() => setReviewRatingHover(0)}>
+                        {[1, 2, 3, 4, 5].map((rating) => {
+                          const active = (reviewRatingHover || reviewRating) >= rating;
+                          return (
+                            <button
+                              key={rating}
+                              type="button"
+                              className="rounded-sm p-1 transition-transform hover:scale-110"
+                              onMouseEnter={() => setReviewRatingHover(rating)}
+                              onFocus={() => setReviewRatingHover(rating)}
+                              onClick={() => setReviewRating(rating)}
+                              aria-label={`${rating} star${rating > 1 ? "s" : ""}`}
+                            >
+                              <Star className={`h-6 w-6 ${active ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"}`} />
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className="text-xs text-muted-foreground">{reviewRating}/5 stars</p>
+                    </div>
                     <Textarea
                       id="review-comment"
                       placeholder="Share your experience with this owner..."
@@ -355,13 +380,19 @@ export default function ItemDetail() {
                   {reviews.length === 0 ? (
                     <p className="text-sm text-muted-foreground">No reviews yet.</p>
                   ) : (
-                    reviews.map((review) => (
+                    reviewPreview.map((review) => (
                       <div key={review.id || review._id} className="rounded-lg border p-3 space-y-2">
                         <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-medium">{review.reviewerName}</p>
-                            <p className="text-xs text-muted-foreground">{format(new Date(review.createdAt), "PPP")}</p>
-                          </div>
+                          <Link to={`/user/${review.reviewerId}`} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+                            <Avatar className="h-9 w-9">
+                              <AvatarImage src={review.reviewerAvatar} alt={review.reviewerName} />
+                              <AvatarFallback>{review.reviewerName.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="text-sm font-medium hover:text-primary transition-colors">{review.reviewerName}</p>
+                              <p className="text-xs text-muted-foreground">{format(new Date(review.createdAt), "PPP")}</p>
+                            </div>
+                          </Link>
                           <div className="flex items-center gap-1 text-sm font-medium">
                             <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                             {review.rating}
@@ -370,6 +401,11 @@ export default function ItemDetail() {
                         <p className="text-sm text-muted-foreground leading-relaxed">{review.comment}</p>
                       </div>
                     ))
+                  )}
+                  {reviews.length > reviewPreview.length && (
+                    <Button variant="ghost" className="px-0" onClick={() => navigate(`/item/${item.id || item._id || ""}/reviews`)}>
+                      View all {reviews.length} reviews
+                    </Button>
                   )}
                 </div>
               </CardContent>

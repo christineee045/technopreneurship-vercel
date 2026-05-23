@@ -4,6 +4,7 @@ import {
   clearAdminToken,
   clearUserToken,
   fetchCurrentUser,
+  fetchCurrentUserWithToken,
   loginUser,
   setUserToken,
   signupUser,
@@ -15,6 +16,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   signup: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
+  refreshUser: () => Promise<void>;
   isLoading: boolean;
 }
 
@@ -50,6 +52,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     initializeAuth();
   }, []);
+
+  const refreshUser = async () => {
+    const token = localStorage.getItem('lendly_token');
+    if (!token) {
+      setUser(null);
+      return;
+    }
+    try {
+      const currentUser = await fetchCurrentUserWithToken(token);
+      setUser(currentUser);
+    } catch {
+      clearUserToken();
+      setUser(null);
+    }
+  };
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
@@ -94,7 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, setUser, login, signup, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, setUser, login, signup, logout, refreshUser, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

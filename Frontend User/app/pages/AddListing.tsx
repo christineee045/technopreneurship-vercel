@@ -19,7 +19,7 @@ export default function AddListing() {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { addNotification } = useNotifications();
+  const { fetchNotifications } = useNotifications();
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -101,14 +101,10 @@ export default function AddListing() {
       };
 
       await createItem(itemData as Partial<Item>);
+      await fetchNotifications();
 
       toast.success("Listing created successfully!", {
-        description: "Your item is now available for borrowing.",
-      });
-      addNotification({
-        title: "Listing published",
-        message: `${itemData.title} is now live on your profile.`,
-        read: false,
+        description: "Your listing has been submitted for review and will go public after approval.",
       });
       
       setTimeout(() => {

@@ -1,6 +1,7 @@
 import { createBrowserRouter } from "react-router";
 import Home from "./pages/Home";
 import ItemDetail from "./pages/ItemDetail";
+import ItemReviewsPage from "./pages/ItemReviewsPage";
 import AddListing from "./pages/AddListing";
 import Dashboard from "./pages/Dashboard";
 import UserProfile from "./pages/UserProfile";
@@ -78,6 +79,10 @@ export const router = createBrowserRouter([
   {
     path: "/privacy-policy",
     Component: PrivacyPolicy,
+  },
+  {
+    path: "/item/:id/reviews",
+    Component: ItemReviewsPage,
   },
   {
     path: "/item/:id",

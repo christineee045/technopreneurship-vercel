@@ -2,7 +2,7 @@ import { Badge } from "./ui/badge";
 import { Clock, CheckCircle, XCircle, Package, AlertCircle } from "lucide-react";
 
 interface StatusBadgeProps {
-  status: 'Pending' | 'Approved' | 'Rejected' | 'Active' | 'Returned' | 'Overdue';
+  status: 'Pending' | 'Approved' | 'Rejected' | 'Active' | 'Returned' | 'Reported' | 'Overdue';
 }
 
 export function StatusBadge({ status }: StatusBadgeProps) {
@@ -32,6 +32,11 @@ export function StatusBadge({ status }: StatusBadgeProps) {
         return {
           color: 'bg-gray-100 text-gray-800 border-gray-200',
           icon: <CheckCircle className="h-3 w-3" />
+        };
+      case 'Reported':
+        return {
+          color: 'bg-rose-100 text-rose-800 border-rose-200',
+          icon: <AlertCircle className="h-3 w-3" />
         };
       case 'Overdue':
         return {

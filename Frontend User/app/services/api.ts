@@ -54,6 +54,7 @@ export interface Item {
   location: string;
   available: boolean;
   isFeatured?: boolean;
+  approvalStatus?: "pending" | "approved" | "rejected";
   createdAt: string;
 }
 
@@ -64,10 +65,22 @@ export interface Review {
   itemTitle: string;
   reviewerId: string;
   reviewerName: string;
+  reviewerAvatar?: string;
   ownerId: string;
   ownerName: string;
   rating: number;
   comment: string;
+  ownerReply?: string;
+  ownerReplyAt?: string;
+  replies?: ReviewReply[];
+  createdAt: string;
+}
+
+export interface ReviewReply {
+  authorId: string;
+  authorName: string;
+  authorAvatar?: string;
+  content: string;
   createdAt: string;
 }
 
@@ -84,11 +97,38 @@ export interface BorrowRequest {
   ownerName: string;
   startDate: string;
   endDate: string;
-  status: "Pending" | "Approved" | "Rejected" | "Active" | "Returned" | "Overdue";
+  status: "Pending" | "Approved" | "Rejected" | "Active" | "Returned" | "Reported" | "Overdue";
   message?: string;
+  borrowerRating?: number;
+  borrowerFeedback?: string;
+  reportReason?: string;
   createdAt: string;
   returnedAt?: string;
 }
+
+export interface BorrowerFeedback {
+  id?: string;
+  itemId: string;
+  itemTitle: string;
+  ownerId: string;
+  ownerName: string;
+  borrowerRating?: number;
+  borrowerFeedback?: string;
+  status: BorrowRequest["status"];
+  createdAt: string;
+  returnedAt?: string;
+}
+
+const normalizeBorrowRequest = (request: BorrowRequest): BorrowRequest => ({
+  ...request,
+  id: request.id || request._id || '',
+});
+
+const normalizeReview = (review: Review): Review => ({
+  ...review,
+  id: review.id || review._id || '',
+  replies: review.replies || [],
+});
 
 export const setUserToken = (token: string) => {
   localStorage.setItem(USER_TOKEN_KEY, token);
@@ -306,7 +346,8 @@ export const fetchBorrowRequests = async (): Promise<BorrowRequest[]> => {
 export const fetchBorrowRequestById = async (id: string): Promise<BorrowRequest> => {
   const response = await fetch(`${API_BASE_URL}/borrow-requests/${id}`);
   if (!response.ok) throw new Error("Failed to fetch borrow request");
-  return response.json();
+  const request = await response.json();
+  return normalizeBorrowRequest(request);
 };
 
 export const fetchBorrowRequestsByBorrowerId = async (
@@ -316,7 +357,8 @@ export const fetchBorrowRequestsByBorrowerId = async (
     headers: getAuthHeaders(),
   });
   if (!response.ok) throw new Error("Failed to fetch your borrow requests");
-  return response.json();
+  const requests = await response.json();
+  return requests.map(normalizeBorrowRequest);
 };
 
 export const fetchBorrowRequestsByOwnerId = async (
@@ -326,6 +368,15 @@ export const fetchBorrowRequestsByOwnerId = async (
     headers: getAuthHeaders(),
   });
   if (!response.ok) throw new Error("Failed to fetch incoming requests");
+  const requests = await response.json();
+  return requests.map(normalizeBorrowRequest);
+};
+
+export const fetchBorrowerFeedbackByBorrowerId = async (
+  borrowerId: string
+): Promise<BorrowerFeedback[]> => {
+  const response = await fetch(`${API_BASE_URL}/borrow-requests/borrower/${borrowerId}/public`);
+  if (!response.ok) throw new Error("Failed to fetch borrower feedback");
   return response.json();
 };
 
@@ -338,7 +389,8 @@ export const createBorrowRequest = async (
     body: JSON.stringify(requestData),
   });
   if (!response.ok) throw new Error("Failed to create borrow request");
-  return response.json();
+  const request = await response.json();
+  return normalizeBorrowRequest(request);
 };
 
 export const createReview = async (
@@ -355,19 +407,67 @@ export const createReview = async (
     throw new Error(error.message || "Failed to create review");
   }
 
-  return response.json();
+  const result = await response.json();
+  return {
+    ...result,
+    review: normalizeReview(result.review),
+  };
 };
 
 export const fetchReviewsByItemId = async (itemId: string): Promise<Review[]> => {
   const response = await fetch(`${API_BASE_URL}/reviews/item/${itemId}`);
   if (!response.ok) throw new Error("Failed to fetch reviews");
-  return response.json();
+  const reviews = await response.json();
+  return reviews.map(normalizeReview);
+};
+
+export const fetchReviewThreadByItemId = async (itemId: string): Promise<Review[]> => {
+  const response = await fetch(`${API_BASE_URL}/reviews/item/${itemId}/thread`);
+  if (!response.ok) throw new Error("Failed to fetch review thread");
+  const reviews = await response.json();
+  return reviews.map(normalizeReview);
 };
 
 export const fetchReviewsByOwnerId = async (ownerId: string): Promise<Review[]> => {
   const response = await fetch(`${API_BASE_URL}/reviews/owner/${ownerId}`);
   if (!response.ok) throw new Error("Failed to fetch reviews");
-  return response.json();
+  const reviews = await response.json();
+  return reviews.map(normalizeReview);
+};
+
+export const fetchReviewsByReviewerId = async (reviewerId: string): Promise<Review[]> => {
+  const response = await fetch(`${API_BASE_URL}/reviews/reviewer/${reviewerId}`);
+  if (!response.ok) throw new Error("Failed to fetch reviews");
+  const reviews = await response.json();
+  return reviews.map(normalizeReview);
+};
+
+export const replyToReview = async (reviewId: string, content: string): Promise<Review> => {
+  const response = await fetch(`${API_BASE_URL}/reviews/${reviewId}/replies`, {
+    method: "POST",
+    headers: getJsonHeaders(),
+    body: JSON.stringify({ content }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || "Failed to reply to review");
+  }
+
+  const review = await response.json();
+  return normalizeReview(review);
+};
+
+export const deleteReview = async (reviewId: string): Promise<void> => {
+  const response = await fetch(`${API_BASE_URL}/reviews/${reviewId}`, {
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || "Failed to delete review");
+  }
 };
 
 export const updateBorrowRequest = async (
@@ -380,7 +480,8 @@ export const updateBorrowRequest = async (
     body: JSON.stringify(updateData),
   });
   if (!response.ok) throw new Error("Failed to update borrow request");
-  return response.json();
+  const request = await response.json();
+  return normalizeBorrowRequest(request);
 };
 
 // Notifications API
@@ -430,7 +531,17 @@ export interface Notification {
   _id?: string;
   id?: string;
   userId: string;
-  type: 'borrow_request' | 'request_approved' | 'request_rejected' | 'item_returned' | 'new_review' | 'system';
+  type:
+    | 'borrow_request_submitted'
+    | 'borrow_request'
+    | 'request_approved'
+    | 'request_rejected'
+    | 'item_returned'
+    | 'new_review'
+    | 'listing_submitted'
+    | 'listing_approved'
+    | 'listing_rejected'
+    | 'system';
   title: string;
   message: string;
   referenceId?: string;

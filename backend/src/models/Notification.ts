@@ -2,7 +2,17 @@ import mongoose, { Schema, Document } from "mongoose";
 
 export interface INotification extends Document {
   userId: string;
-  type: 'borrow_request' | 'request_approved' | 'request_rejected' | 'item_returned' | 'new_review' | 'system';
+  type:
+    | 'borrow_request_submitted'
+    | 'borrow_request'
+    | 'request_approved'
+    | 'request_rejected'
+    | 'item_returned'
+    | 'new_review'
+    | 'listing_submitted'
+    | 'listing_approved'
+    | 'listing_rejected'
+    | 'system';
   title: string;
   message: string;
   referenceId?: string; // e.g., borrow request ID, item ID
@@ -20,7 +30,18 @@ const notificationSchema = new Schema<INotification>({
   },
   type: {
     type: String,
-    enum: ['borrow_request', 'request_approved', 'request_rejected', 'item_returned', 'new_review', 'system'],
+    enum: [
+      'borrow_request_submitted',
+      'borrow_request',
+      'request_approved',
+      'request_rejected',
+      'item_returned',
+      'new_review',
+      'listing_submitted',
+      'listing_approved',
+      'listing_rejected',
+      'system',
+    ],
     required: true,
   },
   title: {

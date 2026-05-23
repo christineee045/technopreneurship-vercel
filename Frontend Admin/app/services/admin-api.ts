@@ -100,7 +100,7 @@ export interface AdminListing {
   deposit: number;
   dailyRate: number;
   image: string;
-  status: "active" | "pending";
+  status: "approved" | "pending" | "rejected";
   featured: boolean;
   createdDate: string;
   borrowCount: number;
@@ -203,6 +203,32 @@ export const fetchAdminListings = async (): Promise<AdminListing[]> => {
     headers: getAuthHeaders(),
   });
   if (!response.ok) throw new Error("Failed to fetch admin listings");
+  return response.json();
+};
+
+export const approveAdminListing = async (id: string): Promise<AdminListing> => {
+  const response = await fetch(`${API_BASE_URL}/listings/${id}/approve`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to approve listing");
+  }
+
+  return response.json();
+};
+
+export const rejectAdminListing = async (id: string): Promise<AdminListing> => {
+  const response = await fetch(`${API_BASE_URL}/listings/${id}/reject`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to reject listing");
+  }
+
   return response.json();
 };
 

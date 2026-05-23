@@ -12,7 +12,17 @@ export interface Notification {
   _id?: string;
   id: string;
   userId: string;
-  type: 'borrow_request' | 'request_approved' | 'request_rejected' | 'item_returned' | 'new_review' | 'system';
+  type:
+    | 'borrow_request_submitted'
+    | 'borrow_request'
+    | 'request_approved'
+    | 'request_rejected'
+    | 'item_returned'
+    | 'new_review'
+    | 'listing_submitted'
+    | 'listing_approved'
+    | 'listing_rejected'
+    | 'system';
   title: string;
   message: string;
   referenceId?: string;

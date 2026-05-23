@@ -11,8 +11,11 @@ export interface IBorrowRequest extends Document {
   ownerName: string;
   startDate: string;
   endDate: string;
-  status: "Pending" | "Approved" | "Rejected" | "Active" | "Returned" | "Overdue";
+  status: "Pending" | "Approved" | "Rejected" | "Active" | "Returned" | "Reported" | "Overdue";
   message?: string;
+  borrowerRating?: number;
+  borrowerFeedback?: string;
+  reportReason?: string;
   returnedAt?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -61,11 +64,24 @@ const borrowRequestSchema = new Schema<IBorrowRequest>(
     },
     status: {
       type: String,
-      enum: ["Pending", "Approved", "Rejected", "Active", "Returned", "Overdue"],
+      enum: ["Pending", "Approved", "Rejected", "Active", "Returned", "Reported", "Overdue"],
       default: "Pending",
     },
     message: {
       type: String,
+    },
+    borrowerRating: {
+      type: Number,
+      min: 1,
+      max: 5,
+    },
+    borrowerFeedback: {
+      type: String,
+      trim: true,
+    },
+    reportReason: {
+      type: String,
+      trim: true,
     },
     returnedAt: {
       type: String,
