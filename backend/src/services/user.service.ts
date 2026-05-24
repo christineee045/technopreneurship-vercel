@@ -16,7 +16,7 @@ export const updateUserProfile = async (
   id: string,
   updateData: Partial<IUser>
 ): Promise<IUser | null> => {
-  const allowedFields = ["name", "avatar"];
+  const allowedFields = ["name", "avatar", "phone"];
   const sanitizedData: Record<string, unknown> = {};
 
   for (const key of allowedFields) {

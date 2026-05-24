@@ -4,6 +4,7 @@ import mongoose, { Schema, Document } from "mongoose";
 export interface IUser extends Document {
   name: string;
   email: string;
+  phone?: string;
   avatar?: string;
   password: string;
   isAdmin: boolean;
@@ -26,6 +27,10 @@ const userSchema = new Schema<IUser>(
       required: true,
       unique: true,
       lowercase: true,
+      trim: true,
+    },
+    phone: {
+      type: String,
       trim: true,
     },
     password: {

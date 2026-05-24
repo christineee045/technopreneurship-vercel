@@ -8,17 +8,20 @@ import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Switch } from "../components/ui/switch";
-import { ArrowLeft, Upload, ImagePlus, Sparkles, Loader2, X } from "lucide-react";
+import { ArrowLeft, Upload, ImagePlus, Sparkles, Loader2, X, CreditCard, Smartphone } from "lucide-react";
 import { Link } from "react-router";
 import { categories } from "../data/categories";
 import { createItem, type Item } from "../services/api";
 import { toast } from "sonner";
-import { useNotifications } from "../context/NotificationContext";
+import { useNotifications } from "../context/useNotifications";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../components/ui/dialog";
 
 export default function AddListing() {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [pendingIsFeatured, setPendingIsFeatured] = useState(false);
   const { fetchNotifications } = useNotifications();
   const [formData, setFormData] = useState({
     title: "",
@@ -336,7 +339,14 @@ export default function AddListing() {
                 <Switch
                   id="featured"
                   checked={formData.isFeatured}
-                  onCheckedChange={(checked) => setFormData({...formData, isFeatured: checked})}
+                  onCheckedChange={async (checked) => {
+                    if (checked) {
+                      setPendingIsFeatured(true);
+                      setShowPaymentModal(true);
+                    } else {
+                      setFormData({ ...formData, isFeatured: false });
+                    }
+                  }}
                 />
               </div>
             </CardContent>
@@ -373,6 +383,61 @@ export default function AddListing() {
           </div>
         </form>
       </div>
+
+      <Dialog open={showPaymentModal} onOpenChange={setShowPaymentModal}>
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              <DialogTitle>Feature Your Listing</DialogTitle>
+            </div>
+            <DialogDescription>
+              Boost your listing's visibility for ₱50/week. Featured items appear at the top of browse results.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm font-medium">Choose a payment method</p>
+            <Button
+              variant="outline"
+              className="w-full h-auto py-4 flex flex-col items-start gap-2 relative"
+              onClick={() => {
+                setShowPaymentModal(false);
+                setFormData(prev => ({ ...prev, isFeatured: true }));
+                toast.success("Payment demo", { description: "GCash payment confirmation coming soon!" });
+              }}
+            >
+              <Smartphone className="h-5 w-5 text-blue-600" />
+              <span className="font-semibold">GCash</span>
+              <span className="text-xs text-muted-foreground">Pay via GCash wallet (demo)</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full h-auto py-4 flex flex-col items-start gap-2 relative"
+              onClick={() => {
+                setShowPaymentModal(false);
+                setFormData(prev => ({ ...prev, isFeatured: true }));
+                toast.success("Payment demo", { description: "Card payment confirmation coming soon!" });
+              }}
+            >
+              <CreditCard className="h-5 w-5 text-primary" />
+              <span className="font-semibold">Credit / Debit Card</span>
+              <span className="text-xs text-muted-foreground">Pay securely with your card (demo)</span>
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full"
+              onClick={() => {
+                setShowPaymentModal(false);
+                setPendingIsFeatured(false);
+                setFormData(prev => ({ ...prev, isFeatured: false }));
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }

@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator 
 } from "./ui/dropdown-menu";
 import { Plus, LayoutDashboard, LogOut, User, Shield } from "lucide-react";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 import { NotificationBell } from "./NotificationBell";
 
 export function Header() {

@@ -3,17 +3,60 @@ import Item from "../models/Item";
 import User from "../models/User";
 import { createNotification } from "./notification.service";
 
-export const createReview = async (reviewData: Partial<IReview>): Promise<IReview> => {
-  const review = await Review.create(reviewData);
+const populateReviewAvatars = async (reviews: IReview[]): Promise<IReview[]> => {
+  const userIds = new Set<string>();
 
-  const ownerReviews = await Review.find({ ownerId: review.ownerId });
+  reviews.forEach((review) => {
+    if (review.reviewerId && !review.reviewerAvatar) {
+      userIds.add(review.reviewerId);
+    }
+
+    review.replies.forEach((reply) => {
+      if (reply.authorId && !reply.authorAvatar) {
+        userIds.add(reply.authorId);
+      }
+    });
+  });
+
+  if (userIds.size === 0) {
+    return reviews;
+  }
+
+  const users = await User.find({ _id: { $in: Array.from(userIds) } }).select("avatar").lean();
+  const avatarMap = new Map(users.map((user) => [user._id.toString(), user.avatar || ""]));
+
+  return reviews.map((review) => {
+    const plainReview = review.toObject();
+
+    return {
+      ...plainReview,
+      reviewerAvatar: plainReview.reviewerAvatar || avatarMap.get(plainReview.reviewerId) || "",
+      replies: plainReview.replies.map((reply: IReview["replies"][number]) => ({
+        ...reply,
+        authorAvatar: reply.authorAvatar || avatarMap.get(reply.authorId) || "",
+      })),
+    } as IReview;
+  });
+};
+
+export const getOwnerReviewStats = async (ownerId: string): Promise<{ reviewCount: number; rating: number }> => {
+  const ownerReviews = await Review.find({ ownerId });
   const reviewCount = ownerReviews.length;
   const averageRating =
     reviewCount === 0
       ? 0
       : ownerReviews.reduce((sum, currentReview) => sum + currentReview.rating, 0) / reviewCount;
 
-  const roundedAverage = Number(averageRating.toFixed(1));
+  return {
+    reviewCount,
+    rating: Number(averageRating.toFixed(1)),
+  };
+};
+
+export const createReview = async (reviewData: Partial<IReview>): Promise<IReview> => {
+  const review = await Review.create(reviewData);
+
+  const { reviewCount, rating: roundedAverage } = await getOwnerReviewStats(review.ownerId);
 
   await User.findByIdAndUpdate(review.ownerId, {
     rating: roundedAverage,
@@ -26,15 +69,18 @@ export const createReview = async (reviewData: Partial<IReview>): Promise<IRevie
 };
 
 export const getReviewsByOwnerId = async (ownerId: string): Promise<IReview[]> => {
-  return Review.find({ ownerId }).sort({ createdAt: -1 });
+  const reviews = await Review.find({ ownerId }).sort({ createdAt: -1 });
+  return populateReviewAvatars(reviews);
 };
 
 export const getReviewsByReviewerId = async (reviewerId: string): Promise<IReview[]> => {
-  return Review.find({ reviewerId }).sort({ createdAt: -1 });
+  const reviews = await Review.find({ reviewerId }).sort({ createdAt: -1 });
+  return populateReviewAvatars(reviews);
 };
 
 export const getReviewsByItemId = async (itemId: string): Promise<IReview[]> => {
-  return Review.find({ itemId }).sort({ createdAt: -1 });
+  const reviews = await Review.find({ itemId }).sort({ createdAt: -1 });
+  return populateReviewAvatars(reviews);
 };
 
 export const replyToReview = async (
@@ -93,14 +139,7 @@ export const deleteReview = async (reviewId: string): Promise<boolean> => {
   await Review.findByIdAndDelete(reviewId);
 
   // Recalculate the owner's rating and review count based on remaining reviews
-  const ownerReviews = await Review.find({ ownerId });
-  const reviewCount = ownerReviews.length;
-  const averageRating =
-    reviewCount === 0
-      ? 0
-      : ownerReviews.reduce((sum, currentReview) => sum + currentReview.rating, 0) / reviewCount;
-
-  const roundedAverage = Number(averageRating.toFixed(1));
+  const { reviewCount, rating: roundedAverage } = await getOwnerReviewStats(ownerId);
 
   // Update the owner's rating and reviewCount
   await User.findByIdAndUpdate(ownerId, {

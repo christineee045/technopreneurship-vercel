@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import { createUser, getUsers, getUserById, updateUserProfile } from "../services/user.service";
+import { getOwnerReviewStats } from "../services/review.service";
 
 export const createUserHandler = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -30,7 +31,15 @@ export const getUserByIdHandler = async (req: Request, res: Response): Promise<v
       res.status(404).json({ message: "User not found" });
       return;
     }
-    res.json(user);
+
+    const { rating, reviewCount } = await getOwnerReviewStats(user._id.toString());
+
+    res.json({
+      ...user.toObject(),
+      id: user._id.toString(),
+      rating,
+      reviewCount,
+    });
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch user", error });
   }
@@ -44,16 +53,17 @@ export const updateUserProfileHandler = async (req: Request, res: Response): Pro
       return;
     }
 
-    const { name, avatar } = req.body;
+    const updateData: Record<string, unknown> = {};
 
-    if (!name && !avatar) {
-      res.status(400).json({ message: "Provide at least one field to update (name or avatar)" });
+    // Only include fields that are explicitly provided (even if empty string to allow clearing)
+    if ('name' in req.body) updateData.name = req.body.name;
+    if ('avatar' in req.body) updateData.avatar = req.body.avatar;
+    if ('phone' in req.body) updateData.phone = req.body.phone;
+
+    if (Object.keys(updateData).length === 0) {
+      res.status(400).json({ message: "Provide at least one field to update (name, avatar, or phone)" });
       return;
     }
-
-    const updateData: Record<string, unknown> = {};
-    if (name) updateData.name = name;
-    if (avatar) updateData.avatar = avatar;
 
     const updatedUser = await updateUserProfile(userId, updateData as Partial<any>);
 

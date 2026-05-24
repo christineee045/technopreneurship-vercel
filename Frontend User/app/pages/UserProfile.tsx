@@ -12,17 +12,20 @@ import {
   Calendar,
   ArrowLeft,
   Shield,
+  Phone,
+  Mail,
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 import {
   fetchUserProfile,
   fetchBorrowerFeedbackByBorrowerId,
+  fetchReviewsByOwnerId,
   type User,
   type Item,
-  type Review,
   type BorrowerFeedback,
+  type Review,
 } from "../services/api";
 
 export default function UserProfile() {
@@ -32,7 +35,7 @@ export default function UserProfile() {
   const [profileUser, setProfileUser] = useState<User | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [lenderReviews, setLenderReviews] = useState<Review[]>([]);
-  const [borrowerFeedback, setBorrowerFeedback] = useState<BorrowerFeedback[]>([]);
+  const [borrowerReviews, setBorrowerReviews] = useState<BorrowerFeedback[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -44,10 +47,11 @@ export default function UserProfile() {
           fetchUserProfile(userId),
           fetchBorrowerFeedbackByBorrowerId(userId),
         ]);
+        const publicLenderReviews = await fetchReviewsByOwnerId(userId);
         setProfileUser(data.user);
         setItems(data.items);
-        setLenderReviews(data.reviews);
-        setBorrowerFeedback(publicBorrowerFeedback);
+        setLenderReviews(publicLenderReviews);
+        setBorrowerReviews(publicBorrowerFeedback);
       } catch (error) {
         console.error("Failed to load profile:", error);
         toast.error("Failed to load profile");
@@ -59,7 +63,7 @@ export default function UserProfile() {
     loadProfile();
   }, [userId, navigate]);
 
-  if (isLoading) {
+  if (isLoading || !profileUser) {
     return (
       <div className="min-h-screen bg-background">
         <Header />
@@ -73,24 +77,13 @@ export default function UserProfile() {
     );
   }
 
-  if (!profileUser) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Header />
-        <div className="container mx-auto px-4 py-16 text-center">
-          <h1 className="text-2xl font-semibold mb-4">User not found</h1>
-          <Link to="/">
-            <Button>Back to Browse</Button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
   const isOwnProfile = currentUser?.id === profileUser.id || currentUser?._id === profileUser._id;
-  const borrowerFeedbackAverage = borrowerFeedback.length === 0
+  const lenderReviewsAverage = lenderReviews.length === 0
     ? 0
-    : Number((borrowerFeedback.reduce((sum, feedback) => sum + (feedback.borrowerRating || 0), 0) / borrowerFeedback.length).toFixed(1));
+    : Number((lenderReviews.reduce((sum, review) => sum + review.rating, 0) / lenderReviews.length).toFixed(1));
+  const borrowerReviewsAverage = borrowerReviews.length === 0
+    ? 0
+    : Number((borrowerReviews.reduce((sum, feedback) => sum + (feedback.borrowerRating || 0), 0) / borrowerReviews.length).toFixed(1));
 
   return (
     <div className="min-h-screen bg-background">
@@ -128,13 +121,29 @@ export default function UserProfile() {
                         <span>Philippines</span>
                       </div>
                     </div>
+                    {profileUser.email && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                        <Mail className="h-4 w-4" />
+                        <a href={`mailto:${profileUser.email}`} className="hover:text-primary transition-colors">
+                          {profileUser.email}
+                        </a>
+                      </div>
+                    )}
+                    {profileUser.phone && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                        <Phone className="h-4 w-4" />
+                        <a href={`tel:${profileUser.phone}`} className="hover:text-primary transition-colors">
+                          {profileUser.phone}
+                        </a>
+                      </div>
+                    )}
                     <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="gap-1" title="Lender rating from item reviews">
+                      <Badge variant="outline" className="gap-1" title="Reviews received as a borrower">
                         <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                        {profileUser.rating.toFixed(1)} lender rating
+                        {lenderReviewsAverage.toFixed(1)} borrower rating
                       </Badge>
-                      <Badge variant="outline">{profileUser.reviewCount} lender reviews</Badge>
-                      <Badge variant="outline">{borrowerFeedback.length} borrower feedback</Badge>
+                      <Badge variant="outline">{lenderReviews.length} borrower reviews</Badge>
+                      <Badge variant="outline">{borrowerReviews.length} lender reviews</Badge>
                     </div>
                   </div>
                   {isOwnProfile && (
@@ -203,21 +212,34 @@ export default function UserProfile() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Star className="h-5 w-5" />
-                  Lender Reviews ({lenderReviews.length})
+                  Borrower Reviews ({lenderReviews.length})
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {lenderReviews.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-8">
-                    No reviews yet.
+                    No borrower reviews yet.
                   </p>
                 ) : (
                   <div className="space-y-4">
-                    {lenderReviews.map((review) => (
-                      <div key={review.id || review._id} className="border-b pb-4 last:border-0">
+                    {lenderReviews.map((review, index) => (
+                      <div
+                        key={review.id || review._id || `${review.itemId}-${index}`}
+                        className="relative border-b pb-4 last:border-0 group"
+                      >
+                        <Link
+                          to={`/item/${review.itemId}`}
+                          className="absolute inset-0 z-0 rounded-md"
+                          aria-label={`Open ${review.itemTitle}`}
+                        />
                         <div className="flex items-start justify-between gap-3 mb-2">
                           <div>
-                            <p className="font-semibold text-sm">{review.reviewerName}</p>
+                            <Link
+                              to={`/user/${review.reviewerId}`}
+                              className="relative z-10 font-semibold text-sm hover:text-primary hover:underline"
+                            >
+                              {review.reviewerName}
+                            </Link>
                             <p className="text-xs text-muted-foreground">
                               {format(new Date(review.createdAt), "PPP")}
                             </p>
@@ -230,13 +252,16 @@ export default function UserProfile() {
                         <p className="text-sm text-muted-foreground leading-relaxed">
                           {review.comment}
                         </p>
-                        <p className="text-xs text-muted-foreground mt-2">
-                          for "{review.itemTitle}"
-                        </p>
+                        <p className="text-xs text-muted-foreground mt-2">for "{review.itemTitle}"</p>
                       </div>
                     ))}
                   </div>
                 )}
+                <div className="pt-3 flex justify-end">
+                  <Button variant="outline" asChild>
+                    <Link to={`/user/${userId}/reviews/borrower`}>See all reviews</Link>
+                  </Button>
+                </div>
               </CardContent>
             </Card>
 
@@ -244,21 +269,34 @@ export default function UserProfile() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Shield className="h-5 w-5" />
-                  Borrower Feedback ({borrowerFeedback.length})
+                  Lender Reviews ({borrowerReviews.length})
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {borrowerFeedback.length === 0 ? (
+                {borrowerReviews.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-8">
-                    No borrower feedback yet.
+                    No lender reviews yet.
                   </p>
                 ) : (
                   <div className="space-y-4">
-                    {borrowerFeedback.map((feedback, index) => (
-                      <div key={feedback.id || `${feedback.itemId}-${index}`} className="border-b pb-4 last:border-0">
+                    {borrowerReviews.map((feedback, index) => (
+                      <div
+                        key={feedback.id || `${feedback.itemId}-${index}`}
+                        className="relative border-b pb-4 last:border-0 group"
+                      >
+                        <Link
+                          to={`/item/${feedback.itemId}`}
+                          className="absolute inset-0 z-0 rounded-md"
+                          aria-label={`Open ${feedback.itemTitle}`}
+                        />
                         <div className="flex items-start justify-between gap-3 mb-2">
                           <div>
-                            <p className="font-semibold text-sm">{feedback.ownerName}</p>
+                            <Link
+                              to={`/user/${feedback.ownerId}`}
+                              className="relative z-10 font-semibold text-sm hover:text-primary hover:underline"
+                            >
+                              {feedback.ownerName}
+                            </Link>
                             <p className="text-xs text-muted-foreground">
                               {format(new Date(feedback.createdAt), "PPP")}
                             </p>
@@ -271,13 +309,16 @@ export default function UserProfile() {
                         <p className="text-sm text-muted-foreground leading-relaxed">
                           {feedback.borrowerFeedback || "No written feedback."}
                         </p>
-                        <p className="text-xs text-muted-foreground mt-2">
-                          for "{feedback.itemTitle}" · {feedback.status}
-                        </p>
+                        <p className="text-xs text-muted-foreground mt-2">for "{feedback.itemTitle}"</p>
                       </div>
                     ))}
                   </div>
                 )}
+                <div className="pt-3 flex justify-end">
+                  <Button variant="outline" asChild>
+                    <Link to={`/user/${userId}/reviews/lender`}>See all reviews</Link>
+                  </Button>
+                </div>
               </CardContent>
             </Card>
 
@@ -291,15 +332,15 @@ export default function UserProfile() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm">Borrower Trust</span>
+                  <span className="text-sm">Borrower Reviews</span>
                   <span className="text-sm font-semibold">
-                    {borrowerFeedback.length > 0 ? `${borrowerFeedbackAverage.toFixed(1)}/5` : "N/A"}
+                    {lenderReviews.length > 0 ? `${lenderReviewsAverage.toFixed(1)}/5` : "N/A"}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm">Lender Trust</span>
+                  <span className="text-sm">Lender Reviews</span>
                   <span className="text-sm font-semibold">
-                    {profileUser.rating >= 4.5 ? "Excellent" : profileUser.rating >= 3.5 ? "Good" : "Needs Improvement"}
+                    {borrowerReviews.length > 0 ? `${borrowerReviewsAverage.toFixed(1)}/5` : "N/A"}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">

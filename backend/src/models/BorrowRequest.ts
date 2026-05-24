@@ -9,6 +9,7 @@ export interface IBorrowRequest extends Document {
   borrowerAvatar?: string;
   ownerId: string;
   ownerName: string;
+  ownerAvatar?: string;
   startDate: string;
   endDate: string;
   status: "Pending" | "Approved" | "Rejected" | "Active" | "Returned" | "Reported" | "Overdue";
@@ -53,6 +54,9 @@ const borrowRequestSchema = new Schema<IBorrowRequest>(
     ownerName: {
       type: String,
       required: true,
+    },
+    ownerAvatar: {
+      type: String,
     },
     startDate: {
       type: String,

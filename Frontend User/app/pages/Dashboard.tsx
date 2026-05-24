@@ -37,20 +37,21 @@ import { createReview, fetchUserItems, fetchBorrowRequestsByBorrowerId, fetchBor
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 
 export default function Dashboard() {
   type DashboardTab = "my-items" | "my-requests" | "incoming" | "reviews" | "rated-users";
   const ITEMS_PER_PAGE = 4;
 
-  const { user, refreshUser } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const userId = user?.id || user?._id || "";
   const [items, setItems] = useState<Item[]>([]);
   const [requests, setRequests] = useState<BorrowRequest[]>([]);
   const [writtenReviews, setWrittenReviews] = useState<Review[]>([]);
   const [receivedReviews, setReceivedReviews] = useState<Review[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isDataLoading, setIsDataLoading] = useState(true);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<DashboardTab>("my-items");
@@ -87,13 +88,9 @@ export default function Dashboard() {
 
     useEffect(() => {
       const loadData = async () => {
-        if (!user) return;
+        if (!userId) return;
         try {
-          setIsLoading(true);
-          const userId = user.id || user._id || "";
-          if (!userId) {
-            throw new Error("User ID not found");
-          }
+          setIsDataLoading(true);
           const [myItemsData, myRequestsData, incomingRequestsData, writtenReviewsData, receivedReviewsData] = await Promise.all([
             fetchUserItems(),
             fetchBorrowRequestsByBorrowerId(userId),
@@ -109,13 +106,11 @@ export default function Dashboard() {
           console.error("Failed to fetch dashboard data:", error);
           toast.error(error instanceof Error ? error.message : "Failed to load dashboard data");
         } finally {
-          setIsLoading(false);
-          // Refresh user data to ensure we have latest reviewCount, rating, etc.
-          refreshUser();
+          setIsDataLoading(false);
         }
       };
       loadData();
-    }, [user, refreshUser]);
+    }, [userId]);
 
   useEffect(() => {
     const tab = searchParams.get("tab");
@@ -124,14 +119,28 @@ export default function Dashboard() {
     }
   }, [searchParams]);
 
+  if (isAuthLoading) {
+      return (
+        <div className="min-h-screen bg-background">
+          <Header />
+          <div className="container mx-auto px-4 py-20 text-center">
+            <div className="inline-flex items-center gap-3 rounded-full border bg-card px-5 py-3 shadow-sm">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              <span className="text-sm text-muted-foreground">Loading dashboard...</span>
+            </div>
+          </div>
+        </div>
+      );
+  }
+
   if (!user) {
     navigate('/login');
     return null;
   }
 
-  const myItems = items.filter(item => item.ownerId === user.id);
-  const myRequests = requests.filter(req => req.borrowerId === user.id);
-  const incomingRequests = requests.filter(req => req.ownerId === user.id);
+  const myItems = items.filter(item => item.ownerId === userId);
+  const myRequests = requests.filter(req => req.borrowerId === userId);
+  const incomingRequests = requests.filter(req => req.ownerId === userId);
   const pendingIncomingRequests = incomingRequests.filter(req => req.borrowerRating === undefined);
   const ratedBorrowerRequests = useMemo(() => {
     const ratedByBorrower = new Map<string, BorrowRequest>();
@@ -197,6 +206,17 @@ export default function Dashboard() {
   const writtenReviewsPage = getPagedList(writtenReviews, reviewPages.written);
   const receivedReviewsPage = getPagedList(receivedReviews, reviewPages.received);
   const ratedUsersPage = getPageData(ratedBorrowerRequests, "rated-users");
+  const loadingStateCard = (
+    <Card>
+      <CardContent className="py-12 text-center">
+        <div className="inline-flex items-center gap-3 rounded-full border bg-card px-5 py-3 shadow-sm">
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <span className="text-sm text-muted-foreground">Loading your dashboard...</span>
+        </div>
+        <p className="mt-4 text-sm text-muted-foreground">Fetching listings, requests, and reviews.</p>
+      </CardContent>
+    </Card>
+  );
 
   const canOpenItem = (item: Item) => (item.approvalStatus ?? "approved") === "approved";
 
@@ -539,7 +559,7 @@ export default function Dashboard() {
 
           {/* My Items Tab */}
           <TabsContent value="my-items" className="space-y-4">
-            {myItems.length === 0 ? (
+            {isDataLoading ? loadingStateCard : myItems.length === 0 ? (
               <Card>
                 <CardContent className="py-12 text-center">
                   <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -660,7 +680,7 @@ export default function Dashboard() {
 
           {/* My Requests Tab */}
           <TabsContent value="my-requests" className="space-y-4">
-            {myRequests.length === 0 ? (
+            {isDataLoading ? loadingStateCard : myRequests.length === 0 ? (
               <Card>
                 <CardContent className="py-12 text-center">
                   <Send className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -715,12 +735,27 @@ export default function Dashboard() {
                         <p className="text-sm text-muted-foreground mt-2">
                           Request status: {request.status}
                         </p>
+                        {request.status === 'Returned' && (request.borrowerRating !== undefined || request.borrowerFeedback) && (
+                          <div className="mt-3 p-3 bg-muted/50 rounded-lg space-y-1">
+                            <p className="text-xs font-medium text-muted-foreground">Owner's Feedback</p>
+                            {request.borrowerRating !== undefined && (
+                              <div className="flex items-center gap-1">
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                  <Star key={star} className={`h-4 w-4 ${star <= request.borrowerRating! ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"}`} />
+                                ))}
+                              </div>
+                            )}
+                            {request.borrowerFeedback && (
+                              <p className="text-sm">{request.borrowerFeedback}</p>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-              {myRequestsPage.totalPages > 1 && (
+                    </CardContent>
+                  </Card>
+                ))}
+                {myRequestsPage.totalPages > 1 && (
                 <div className="flex items-center justify-between gap-3 pt-2">
                   <p className="text-sm text-muted-foreground">
                     Page {myRequestsPage.currentPage} of {myRequestsPage.totalPages}
@@ -741,7 +776,7 @@ export default function Dashboard() {
 
           {/* Incoming Requests Tab */}
           <TabsContent value="incoming" className="space-y-4">
-            {pendingIncomingRequests.length === 0 ? (
+            {isDataLoading ? loadingStateCard : pendingIncomingRequests.length === 0 ? (
               <Card>
                 <CardContent className="py-12 text-center">
                   <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -862,7 +897,7 @@ export default function Dashboard() {
                 <CardDescription>These are the reviews you left on items you borrowed.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {writtenReviews.length === 0 ? (
+                {isDataLoading ? loadingStateCard : writtenReviews.length === 0 ? (
                   <div className="py-10 text-center">
                     <Star className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                     <h3 className="font-medium mb-2">No reviews written yet</h3>
@@ -931,7 +966,7 @@ export default function Dashboard() {
                 <CardDescription>Feedback left by borrowers on items you own.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {receivedReviews.length === 0 ? (
+                {isDataLoading ? loadingStateCard : receivedReviews.length === 0 ? (
                   <div className="py-10 text-center">
                     <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                     <h3 className="font-medium mb-2">No item reviews yet</h3>
@@ -1011,7 +1046,7 @@ export default function Dashboard() {
           </TabsContent>
 
           <TabsContent value="rated-users" className="space-y-4">
-            {ratedBorrowerRequests.length === 0 ? (
+            {isDataLoading ? loadingStateCard : ratedBorrowerRequests.length === 0 ? (
               <Card>
                 <CardContent className="py-12 text-center">
                   <Star className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -1053,11 +1088,8 @@ export default function Dashboard() {
                         <p className="text-sm text-muted-foreground">
                           {request.borrowerFeedback || "No written feedback."}
                         </p>
-                        <div className="flex items-center justify-between text-xs text-muted-foreground">
-                          <span>{format(new Date(request.returnedAt || request.createdAt), 'PPP')}</span>
-                          <Button variant="ghost" size="sm" className="px-0" onClick={(e) => { e.stopPropagation(); navigate(`/user/${request.borrowerId}`); }}>
-                            Open profile
-                          </Button>
+                        <div className="text-xs text-muted-foreground">
+                          {format(new Date(request.returnedAt || request.createdAt), 'PPP')}
                         </div>
                       </CardContent>
                     </Card>
@@ -1128,20 +1160,47 @@ export default function Dashboard() {
               </div>
 
               {selectedRequest.borrowerId === user.id && (selectedRequest.status === 'Approved' || selectedRequest.status === 'Active') && (
-                <Card>
-                  <CardContent className="p-4 flex items-center justify-between gap-4">
-                    <div>
-                      <p className="font-medium">Finish this borrow</p>
-                      <p className="text-sm text-muted-foreground">Mark the item as returned when you hand it back.</p>
-                    </div>
-                    <Button onClick={() => handleMarkReturned(selectedRequest)}>
-                      Mark as Returned
-                    </Button>
-                  </CardContent>
-                </Card>
-              )}
+                 <Card>
+                   <CardContent className="p-4 flex items-center justify-between gap-4">
+                     <div>
+                       <p className="font-medium">Finish this borrow</p>
+                       <p className="text-sm text-muted-foreground">Mark the item as returned when you hand it back.</p>
+                     </div>
+                     <Button onClick={() => handleMarkReturned(selectedRequest)}>
+                       Mark as Returned
+                     </Button>
+                   </CardContent>
+                 </Card>
+               )}
 
-              {selectedRequest.borrowerId === user.id && selectedRequest.status === 'Returned' && (
+               {selectedRequest.borrowerId === user.id && selectedRequest.status === 'Returned' && (selectedRequest.borrowerRating !== undefined || selectedRequest.borrowerFeedback) && (
+                 <Card>
+                   <CardHeader>
+                     <CardTitle>Owner's Feedback</CardTitle>
+                     <CardDescription>Feedback from the owner about your borrow</CardDescription>
+                   </CardHeader>
+                   <CardContent className="space-y-3">
+                     {selectedRequest.borrowerRating !== undefined && (
+                       <div className="space-y-2">
+                         <Label>Rating</Label>
+                         <div className="flex items-center gap-1">
+                           {[1, 2, 3, 4, 5].map((star) => (
+                             <Star key={star} className={`h-5 w-5 ${star <= selectedRequest.borrowerRating! ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"}`} />
+                           ))}
+                         </div>
+                       </div>
+                     )}
+                     {selectedRequest.borrowerFeedback && (
+                       <div className="space-y-2">
+                         <Label>Feedback</Label>
+                         <p className="text-sm">{selectedRequest.borrowerFeedback}</p>
+                       </div>
+                     )}
+                   </CardContent>
+                 </Card>
+               )}
+
+               {selectedRequest.borrowerId === user.id && selectedRequest.status === 'Returned' && (
                 <Card>
                   <CardHeader>
                     <CardTitle>Rate the Item Owner</CardTitle>

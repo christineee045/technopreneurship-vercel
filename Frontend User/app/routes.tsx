@@ -2,6 +2,9 @@ import { createBrowserRouter } from "react-router";
 import Home from "./pages/Home";
 import ItemDetail from "./pages/ItemDetail";
 import ItemReviewsPage from "./pages/ItemReviewsPage";
+import UserReviewsAboutPage from "./pages/UserReviewsAboutPage";
+import UserLenderReviewsPage from "./pages/UserLenderReviewsPage";
+import UserWrittenReviewsPage from "./pages/UserWrittenReviewsPage";
 import AddListing from "./pages/AddListing";
 import Dashboard from "./pages/Dashboard";
 import UserProfile from "./pages/UserProfile";
@@ -107,6 +110,22 @@ export const router = createBrowserRouter([
   {
     path: "/user/:userId",
     Component: UserProfile,
+  },
+  {
+    path: "/user/:userId/reviews/about",
+    Component: UserReviewsAboutPage,
+  },
+  {
+    path: "/user/:userId/reviews/lender",
+    Component: UserReviewsAboutPage,
+  },
+  {
+    path: "/user/:userId/reviews/borrower",
+    Component: UserLenderReviewsPage,
+  },
+  {
+    path: "/user/:userId/reviews/written",
+    Component: UserWrittenReviewsPage,
   },
   {
     path: "/admin",

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 import { fetchCurrentUserWithToken, type User } from "../services/api";
 
 export default function RequireAdmin({ children }: { children: React.ReactNode }) {

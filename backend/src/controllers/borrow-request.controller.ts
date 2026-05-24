@@ -136,6 +136,7 @@ export const getPublicBorrowerFeedbackHandler = async (
         itemTitle: request.itemTitle,
         ownerId: request.ownerId,
         ownerName: request.ownerName,
+        ownerAvatar: request.ownerAvatar,
         borrowerRating: request.borrowerRating,
         borrowerFeedback: request.borrowerFeedback,
         status: request.status,

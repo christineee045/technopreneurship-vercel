@@ -2,11 +2,13 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User, { type IUser } from "../models/User";
 import type { AuthTokenPayload } from "../types/auth";
+import { getOwnerReviewStats } from "./review.service";
 
 type AuthUserResponse = {
   id: string;
   name: string;
   email: string;
+  phone?: string;
   avatar?: string;
   isAdmin: boolean;
   joinDate: string;
@@ -24,22 +26,28 @@ const getJwtSecret = () => {
   return secret;
 };
 
-const buildUserResponse = (user: IUser): AuthUserResponse => ({
-  id: user._id.toString(),
-  name: user.name,
-  email: user.email,
-  avatar: user.avatar,
-  isAdmin: user.isAdmin,
-  joinDate: user.joinDate,
-  rating: user.rating,
-  reviewCount: user.reviewCount,
-});
+const buildUserResponse = async (user: IUser): Promise<AuthUserResponse> => {
+  const { rating, reviewCount } = await getOwnerReviewStats(user._id.toString());
+
+  return {
+    id: user._id.toString(),
+    name: user.name,
+    email: user.email,
+    phone: user.phone,
+    avatar: user.avatar,
+    isAdmin: user.isAdmin,
+    joinDate: user.joinDate,
+    rating,
+    reviewCount,
+  };
+};
 
 const buildToken = (user: IUser) => {
   const payload: AuthTokenPayload = {
     id: user._id.toString(),
     name: user.name,
     email: user.email,
+    phone: user.phone,
     isAdmin: user.isAdmin,
   };
 
@@ -58,7 +66,7 @@ export const signup = async (userData: Partial<IUser>) => {
 
   return {
     token,
-    user: buildUserResponse(user),
+    user: await buildUserResponse(user),
   };
 };
 
@@ -79,7 +87,7 @@ export const login = async (email: string, password: string) => {
 
   return {
     token,
-    user: buildUserResponse(user),
+    user: await buildUserResponse(user),
   };
 };
 

@@ -28,6 +28,7 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
       id: decoded.id,
       name: decoded.name,
       email: decoded.email,
+      phone: decoded.phone,
       isAdmin: decoded.isAdmin,
     };
 

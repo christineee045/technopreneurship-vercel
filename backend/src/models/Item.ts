@@ -11,6 +11,8 @@ export interface IItem extends Document {
   ownerId: string;
   ownerName: string;
   ownerAvatar?: string;
+  ownerEmail?: string;
+  ownerPhone?: string;
   ownerRating: number;
   location: string;
   available: boolean;
@@ -18,6 +20,8 @@ export interface IItem extends Document {
   approvalStatus?: "pending" | "approved" | "rejected";
   createdAt: Date;
   updatedAt: Date;
+  estimatedAvailableAt?: string;
+  availabilityBufferDays?: number;
 }
 
 const itemSchema = new Schema<IItem>(
@@ -62,10 +66,16 @@ const itemSchema = new Schema<IItem>(
       type: String,
       required: true,
     },
-    ownerAvatar: {
-      type: String,
-    },
-    ownerRating: {
+ownerAvatar: {
+       type: String,
+     },
+     ownerEmail: {
+       type: String,
+     },
+     ownerPhone: {
+       type: String,
+     },
+     ownerRating: {
       type: Number,
       required: true,
     },

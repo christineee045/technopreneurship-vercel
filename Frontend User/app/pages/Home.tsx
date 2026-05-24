@@ -9,7 +9,7 @@ import { Badge } from "../components/ui/badge";
 import { Search, Filter, Sparkles, TrendingUp, Users, Shield } from "lucide-react";
 import { categories } from "../data/categories";
 import { fetchItems, type Item } from "../services/api";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 import { toast } from "sonner";
 
 export default function Home() {
@@ -57,7 +57,28 @@ export default function Home() {
     return matchesSearch && matchesCategory && matchesLocation && matchesMinPrice && matchesMaxPrice;
   });
 
+  const isSearching =
+    searchQuery.trim() !== "" ||
+    selectedCategory !== "all" ||
+    locationQuery.trim() !== "" ||
+    minPrice.trim() !== "" ||
+    maxPrice.trim() !== "";
+
   const featuredItems = items.filter(item => item.isFeatured);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="container mx-auto px-4 py-20 text-center">
+          <div className="inline-flex items-center gap-3 rounded-full border bg-card px-5 py-3 shadow-sm">
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            <span className="text-sm text-muted-foreground">Loading items...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -158,7 +179,7 @@ export default function Home() {
       </section>
 
       {/* Featured Items */}
-      {featuredItems.length > 0 && (
+      {featuredItems.length > 0 && !isSearching && (
         <section id="featured-items" className="py-12 bg-background">
           <div className="container mx-auto px-4">
             <div className="flex items-center gap-2 mb-6">

@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 import { Header } from '../components/Header';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -10,7 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
 import { Badge } from '../components/ui/badge';
 import { AvatarCropModal } from '../components/AvatarCropModal';
 import { fetchItems, updateUserProfile, type Item } from '../services/api';
-import { Calendar, MapPin, Star, Package, Edit, Loader2, Camera } from 'lucide-react';
+import { Calendar, MapPin, Star, Package, Edit, Loader2, Camera, Phone } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 
@@ -23,6 +23,7 @@ export default function Account() {
   const [name, setName] = useState(user?.name || '');
   const [avatar, setAvatar] = useState(user?.avatar || '');
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [phone, setPhone] = useState(user?.phone || '');
   const [userListings, setUserListings] = useState<Item[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -54,13 +55,16 @@ export default function Account() {
 
   useEffect(() => {
     // Sync local state when user updates (e.g., after avatar change)
-    if (user?.avatar) {
+    if (user?.avatar && !avatarFile) {
       setAvatar(user.avatar);
     }
     if (user?.name) {
       setName(user.name);
     }
-  }, [user?.avatar, user?.name]);
+    if (user?.phone) {
+      setPhone(user.phone);
+    }
+  }, [user?.avatar, user?.name, user?.phone, avatarFile]);
 
   useEffect(() => {
     const tab = searchParams.get('tab');
@@ -113,6 +117,12 @@ export default function Account() {
     }
   };
 
+  const validatePhoneNumber = (phoneNumber: string): boolean => {
+    if (!phoneNumber.trim()) return true; // Empty is allowed
+    const phoneRegex = /^[+]?[(]?[0-9]{3}[)]?[-\s.]?[0-9]{3}[-\s.]?[0-9]{4,6}$/;
+    return phoneRegex.test(phoneNumber) || /^\d{7,}$/.test(phoneNumber.replace(/[^\d]/g, ''));
+  };
+
   const handleSave = async () => {
     if (!user?.id) {
       toast.error('User not found');
@@ -121,6 +131,11 @@ export default function Account() {
 
     if (!name.trim()) {
       toast.error('Name cannot be empty');
+      return;
+    }
+
+    if (phone.trim() && !validatePhoneNumber(phone)) {
+      toast.error('Please enter a valid phone number');
       return;
     }
 
@@ -133,6 +148,10 @@ export default function Account() {
         updateData.avatar = avatar;
       } else if (avatar !== user.avatar) {
         updateData.avatar = avatar;
+      }
+
+      if (phone !== (user?.phone || '')) {
+        updateData.phone = phone;
       }
 
       const updatedUser = await updateUserProfile(updateData);
@@ -157,6 +176,7 @@ export default function Account() {
   const handleCancel = () => {
     setName(user?.name || '');
     setAvatar(user?.avatar || '');
+    setPhone(user?.phone || '');
     setAvatarFile(null);
     setIsEditing(false);
   };
@@ -278,6 +298,18 @@ export default function Account() {
                         <p className="text-xs text-muted-foreground">
                           Contact support to change your email address
                         </p>
+                      </div>
+
+                      <div className="grid gap-2">
+                        <Label htmlFor="phone">Phone Number</Label>
+                        <Input
+                          id="phone"
+                          type="tel"
+                          placeholder="e.g. +63 912 345 6789"
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value.replace(/\s+/g, ''))}
+                          disabled={!isEditing}
+                        />
                       </div>
 
                       <div className="grid gap-2">

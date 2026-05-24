@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router";
 import { Header } from "../components/Header";
 import { Button } from "../components/ui/button";
@@ -18,12 +18,14 @@ import {
   AlertCircle, 
   ArrowLeft,
   Send,
-  CheckCircle
+  CheckCircle,
+  Phone,
+  Mail
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { useAuth } from "../context/AuthContext";
-import { useNotifications } from "../context/NotificationContext";
+import { useAuth } from "../context/useAuth";
+import { useNotifications } from "../context/useNotifications";
 import {
   createBorrowRequest,
   createReview,
@@ -51,6 +53,14 @@ export default function ItemDetail() {
   const [endDate, setEndDate] = useState<Date>();
   const [message, setMessage] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const availabilityStartDate = useMemo(() => {
+    if (item?.available) {
+      return new Date();
+    }
+
+    const estimated = item?.estimatedAvailableAt ? new Date(item.estimatedAvailableAt) : new Date();
+    return new Date(Math.max(Date.now(), estimated.getTime()));
+  }, [item?.available, item?.estimatedAvailableAt]);
 
   useEffect(() => {
     const loadItem = async () => {
@@ -140,6 +150,7 @@ export default function ItemDetail() {
         borrowerAvatar: user.avatar,
         ownerId: item.ownerId,
         ownerName: item.ownerName,
+        ownerAvatar: item.ownerAvatar,
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
         status: "Pending",
@@ -266,6 +277,16 @@ export default function ItemDetail() {
               <Badge variant={item.available ? "secondary" : "destructive"} className="mb-4">
                 {item.available ? "Available" : "Currently Unavailable"}
               </Badge>
+              {!item.available && (
+                <div className="mb-4 rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">
+                  <p className="font-medium text-foreground">Reserve for a future date</p>
+                  <p>
+                    {item.estimatedAvailableAt
+                      ? `Estimated available from ${format(new Date(item.estimatedAvailableAt), "PPP")}${item.availabilityBufferDays ? ` with a ${item.availabilityBufferDays}-day buffer` : ""}.`
+                      : "This item is currently reserved. You can still place a future reservation."}
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Description */}
@@ -280,30 +301,52 @@ export default function ItemDetail() {
               <Badge variant="outline">{item.category}</Badge>
             </div>
 
-            {/* Owner Info */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Owner Information</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Link
-                    to={`/user/${item.ownerId}`}
-                    className="flex items-center gap-4 hover:bg-muted/50 rounded-lg p-2 -mx-2 transition-colors"
-                  >
-                    <Avatar className="h-12 w-12">
-                      <AvatarImage src={item.ownerAvatar} alt={item.ownerName} />
-                      <AvatarFallback>{item.ownerName.split(' ').map(n => n[0]).join('')}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                      <div className="font-semibold hover:text-primary transition-colors">{item.ownerName}</div>
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                        <span>{item.ownerRating.toFixed(1)} rating</span>
-                      </div>
-                    </div>
-                  </Link>
-                </CardContent>
-              </Card>
+             {/* Owner Info */}
+               <Card>
+                 <CardHeader>
+                   <CardTitle className="text-base">Owner Information</CardTitle>
+                 </CardHeader>
+                 <CardContent>
+                   <div className="flex items-center gap-4">
+                     <Link
+                       to={`/user/${item.ownerId}`}
+                       className="flex items-center gap-4 hover:bg-muted/50 rounded-lg p-2 -mx-2 flex-1 transition-colors"
+                     >
+                       <Avatar className="h-12 w-12">
+                         <AvatarImage src={item.ownerAvatar} alt={item.ownerName} />
+                         <AvatarFallback>{item.ownerName.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+                       </Avatar>
+                       <div className="flex-1">
+                         <div className="font-semibold hover:text-primary transition-colors">{item.ownerName}</div>
+                         <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                           <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                           <span>{item.ownerRating.toFixed(1)} rating</span>
+                         </div>
+                       </div>
+                     </Link>
+                     <div className="flex gap-2">
+                       {item.ownerPhone && (
+                         <a
+                           href={`tel:${item.ownerPhone}`}
+                           className="inline-flex items-center justify-center rounded-md bg-primary text-primary-foreground h-10 w-10 hover:bg-primary/90 transition-colors"
+                           aria-label={`Call ${item.ownerName}`}
+                         >
+                           <Phone className="h-4 w-4" />
+                         </a>
+                       )}
+                       {item.ownerEmail && (
+                         <a
+                           href={`mailto:${item.ownerEmail}`}
+                           className="inline-flex items-center justify-center rounded-md border bg-background h-10 w-10 hover:bg-accent transition-colors"
+                           aria-label={`Email ${item.ownerName}`}
+                         >
+                           <Mail className="h-4 w-4" />
+                         </a>
+                       )}
+                     </div>
+                   </div>
+                 </CardContent>
+               </Card>
 
             <Card>
               <CardHeader>
@@ -437,11 +480,11 @@ export default function ItemDetail() {
                 <Button
                   size="lg"
                   className="w-full"
-                  disabled={!item.available || isRequesting}
+                  disabled={isRequesting}
                   onClick={handleBorrowClick}
                 >
                   <Send className="h-4 w-4 mr-2" />
-                  {isRequesting ? "Sending Request..." : "Request to Borrow"}
+                  {isRequesting ? "Sending Request..." : item.available ? "Request to Borrow" : "Reserve Item"}
                 </Button>
                 <DialogContent className="sm:max-w-[500px]">
                   <DialogHeader>
@@ -469,7 +512,7 @@ export default function ItemDetail() {
                           mode="single"
                           selected={startDate}
                           onSelect={setStartDate}
-                          disabled={(date) => date < new Date()}
+                          disabled={(date) => date < availabilityStartDate}
                         />
                       </PopoverContent>
                     </Popover>
@@ -508,6 +551,30 @@ export default function ItemDetail() {
                       rows={4}
                     />
                   </div>
+
+                  {(item.ownerPhone || item.ownerEmail) && (
+                    <div className="bg-muted p-4 rounded-lg space-y-2">
+                      <p className="text-sm font-medium text-foreground">Contact the owner</p>
+                      {item.ownerPhone && (
+                        <a
+                          href={`tel:${item.ownerPhone}`}
+                          className="flex items-center gap-2 text-sm text-primary hover:underline"
+                        >
+                          <Phone className="h-4 w-4" />
+                          {item.ownerPhone}
+                        </a>
+                      )}
+                      {item.ownerEmail && (
+                        <a
+                          href={`mailto:${item.ownerEmail}`}
+                          className="flex items-center gap-2 text-sm text-primary hover:underline"
+                        >
+                          <Mail className="h-4 w-4" />
+                          {item.ownerEmail}
+                        </a>
+                      )}
+                    </div>
+                  )}
 
                   <div className="bg-muted p-4 rounded-lg">
                     <div className="flex gap-2 text-sm">

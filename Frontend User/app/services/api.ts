@@ -24,6 +24,7 @@ export interface User {
   id?: string;
   name: string;
   email: string;
+  phone?: string;
   avatar?: string;
   password?: string;
   isAdmin: boolean;
@@ -50,9 +51,13 @@ export interface Item {
   ownerId: string;
   ownerName: string;
   ownerAvatar?: string;
+  ownerEmail?: string;
+  ownerPhone?: string;
   ownerRating: number;
   location: string;
   available: boolean;
+  estimatedAvailableAt?: string;
+  availabilityBufferDays?: number;
   isFeatured?: boolean;
   approvalStatus?: "pending" | "approved" | "rejected";
   createdAt: string;
@@ -95,6 +100,7 @@ export interface BorrowRequest {
   borrowerAvatar?: string;
   ownerId: string;
   ownerName: string;
+  ownerAvatar?: string;
   startDate: string;
   endDate: string;
   status: "Pending" | "Approved" | "Rejected" | "Active" | "Returned" | "Reported" | "Overdue";
@@ -112,6 +118,7 @@ export interface BorrowerFeedback {
   itemTitle: string;
   ownerId: string;
   ownerName: string;
+  ownerAvatar?: string;
   borrowerRating?: number;
   borrowerFeedback?: string;
   status: BorrowRequest["status"];
@@ -262,6 +269,7 @@ export const fetchUserProfile = async (userId: string) => {
 export const updateUserProfile = async (profileData: {
   name?: string;
   avatar?: string;
+  phone?: string;
 }): Promise<User> => {
   const response = await fetch(`${API_BASE_URL}/users/profile/me`, {
     method: "PUT",
