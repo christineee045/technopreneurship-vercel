@@ -11,7 +11,10 @@ import {
   getAdminStats,
   getDashboardData,
   updateListingApprovalStatus,
+  updateListingFeaturedStatus,
+  deleteListingByAdmin,
 } from "../services/admin.service";
+import { getAllReviews, deleteReview as deleteReviewService, updateReviewVisibility as updateReviewVisibilityService } from "../services/review.service";
 import { createNotification } from "../services/notification.service";
 
 export const getUsers = async (req: Request, res: Response) => {
@@ -98,6 +101,53 @@ export const rejectListing = async (req: Request, res: Response) => {
   }
 };
 
+export const updateListingFeatured = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const itemId = Array.isArray(id) ? id[0] : id;
+    const { isFeatured } = req.body;
+
+    if (!itemId) {
+      res.status(400).json({ message: "Invalid listing id" });
+      return;
+    }
+
+    const listing = await updateListingFeaturedStatus(itemId, Boolean(isFeatured));
+    if (!listing) {
+      res.status(404).json({ message: "Listing not found" });
+      return;
+    }
+
+    res.status(200).json(listing);
+  } catch (error) {
+    console.error("Error updating listing featured status:", error);
+    res.status(500).json({ message: "Failed to update listing featured status" });
+  }
+};
+
+export const deleteListing = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const itemId = Array.isArray(id) ? id[0] : id;
+
+    if (!itemId) {
+      res.status(400).json({ message: "Invalid listing id" });
+      return;
+    }
+
+    const deleted = await deleteListingByAdmin(itemId);
+    if (!deleted) {
+      res.status(404).json({ message: "Listing not found" });
+      return;
+    }
+
+    res.status(200).json({ message: "Listing deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting listing:", error);
+    res.status(500).json({ message: "Failed to delete listing" });
+  }
+};
+
 export const getBorrowRequests = async (req: Request, res: Response) => {
   try {
     const requests = await getAdminBorrowRequests();
@@ -175,5 +225,62 @@ export const getDashboard = async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Error fetching dashboard data:", error);
     res.status(500).json({ message: "Failed to fetch dashboard data" });
+  }
+};
+
+export const getReviews = async (_req: Request, res: Response) => {
+  try {
+    const reviews = await getAllReviews();
+    res.status(200).json(reviews);
+  } catch (error) {
+    console.error("Error fetching reviews:", error);
+    res.status(500).json({ message: "Failed to fetch reviews" });
+  }
+};
+
+export const updateReviewVisibility = async (req: Request, res: Response) => {
+  try {
+    const { reviewId } = req.params;
+    const resolvedReviewId = Array.isArray(reviewId) ? reviewId[0] : reviewId;
+    const { isHidden } = req.body;
+
+    if (!resolvedReviewId) {
+      res.status(400).json({ message: "Invalid review id" });
+      return;
+    }
+
+    const review = await updateReviewVisibilityService(resolvedReviewId, Boolean(isHidden));
+    if (!review) {
+      res.status(404).json({ message: "Review not found" });
+      return;
+    }
+
+    res.status(200).json(review);
+  } catch (error) {
+    console.error("Error updating review visibility:", error);
+    res.status(500).json({ message: "Failed to update review visibility" });
+  }
+};
+
+export const deleteReview = async (req: Request, res: Response) => {
+  try {
+    const { reviewId } = req.params;
+    const resolvedReviewId = Array.isArray(reviewId) ? reviewId[0] : reviewId;
+
+    if (!resolvedReviewId) {
+      res.status(400).json({ message: "Invalid review id" });
+      return;
+    }
+
+    const deleted = await deleteReviewService(resolvedReviewId);
+    if (!deleted) {
+      res.status(404).json({ message: "Review not found" });
+      return;
+    }
+
+    res.status(200).json({ message: "Review deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting review:", error);
+    res.status(500).json({ message: "Failed to delete review" });
   }
 };

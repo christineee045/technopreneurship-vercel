@@ -8,7 +8,7 @@ import {
   updateItem,
   deleteItem,
 } from "../services/item.service";
-import { createNotification } from "../services/notification.service";
+import { createNotification, notifyAdmins } from "../services/notification.service";
 
 export const createItemHandler = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -44,6 +44,19 @@ export const createItemHandler = async (req: Request, res: Response): Promise<vo
       });
     } catch (notificationError) {
       console.error("Failed to create listing submission notification:", notificationError);
+    }
+
+    // Notify all admins about the new listing submitted for review
+    try {
+      await notifyAdmins({
+        type: "listing_submitted",
+        title: "New Listing Submitted",
+        message: `${user.name} submitted a new listing \"${item.title}\" for review.`,
+        referenceId: item._id?.toString(),
+        referenceType: "item",
+      });
+    } catch (adminNotifError) {
+      console.error("Failed to notify admins about new listing:", adminNotifError);
     }
 
     res.status(201).json(item);

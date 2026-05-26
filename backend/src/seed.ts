@@ -1,11 +1,12 @@
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import bcrypt from "bcryptjs";
+import { resolve } from "path";
 import User from "./models/User";
 import Item from "./models/Item";
 import BorrowRequest from "./models/BorrowRequest";
 
-dotenv.config();
+dotenv.config({ path: resolve(__dirname, "../.env") });
 
 const MONGO_URI = process.env.MONGO_URI;
 

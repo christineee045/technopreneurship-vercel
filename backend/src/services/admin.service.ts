@@ -85,7 +85,7 @@ export const getAdminUsers = async () => {
 };
 
 export const getAdminListings = async () => {
-  const items = await Item.find();
+  const items = await Item.find().sort({ createdAt: -1 });
   const requests = await BorrowRequest.find();
 
   return items.map((item: any) => {
@@ -115,6 +115,15 @@ export const updateListingApprovalStatus = async (
   return Item.findByIdAndUpdate(itemId, { approvalStatus }, { new: true });
 };
 
+export const updateListingFeaturedStatus = async (itemId: string, isFeatured: boolean) => {
+  return Item.findByIdAndUpdate(itemId, { isFeatured }, { new: true });
+};
+
+export const deleteListingByAdmin = async (itemId: string) => {
+  const deleted = await Item.findByIdAndDelete(itemId);
+  return !!deleted;
+};
+
 export const getAdminBorrowRequests = async () => {
   const requests = await BorrowRequest.find();
   const items = await Item.find();
@@ -141,7 +150,11 @@ export const getAdminBorrowRequests = async () => {
       status: request.status,
       deposit: item?.deposit || 0,
       createdAt: request.createdAt,
+      returnedAt: request.returnedAt,
       message: request.message,
+      reportReason: request.reportReason,
+      borrowerRating: request.borrowerRating,
+      borrowerFeedback: request.borrowerFeedback,
     };
   });
 };

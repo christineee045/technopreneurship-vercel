@@ -75,6 +75,7 @@ export interface Review {
   ownerName: string;
   rating: number;
   comment: string;
+  isHidden?: boolean;
   ownerReply?: string;
   ownerReplyAt?: string;
   replies?: ReviewReply[];
@@ -129,6 +130,12 @@ export interface BorrowerFeedback {
 const normalizeBorrowRequest = (request: BorrowRequest): BorrowRequest => ({
   ...request,
   id: request.id || request._id || '',
+});
+
+const normalizeItem = (item: Item): Item => ({
+  ...item,
+  id: item.id || item._id || '',
+  images: item.images || [],
 });
 
 const normalizeReview = (review: Review): Review => ({
@@ -289,19 +296,22 @@ export const updateUserProfile = async (profileData: {
 export const fetchItems = async (): Promise<Item[]> => {
   const response = await fetch(`${API_BASE_URL}/items`);
   if (!response.ok) throw new Error("Failed to fetch items");
-  return response.json();
+  const items = await response.json();
+  return items.map(normalizeItem);
 };
 
 export const fetchFeaturedItems = async (): Promise<Item[]> => {
   const response = await fetch(`${API_BASE_URL}/items/featured`);
   if (!response.ok) throw new Error("Failed to fetch featured items");
-  return response.json();
+  const items = await response.json();
+  return items.map(normalizeItem);
 };
 
 export const fetchItemById = async (id: string): Promise<Item> => {
   const response = await fetch(`${API_BASE_URL}/items/${id}`);
   if (!response.ok) throw new Error("Failed to fetch item");
-  return response.json();
+  const item = await response.json();
+  return normalizeItem(item);
 };
 
 export const createItem = async (itemData: Partial<Item>): Promise<Item> => {
@@ -311,7 +321,8 @@ export const createItem = async (itemData: Partial<Item>): Promise<Item> => {
     body: JSON.stringify(itemData),
   });
   if (!response.ok) throw new Error("Failed to create item");
-  return response.json();
+  const item = await response.json();
+  return normalizeItem(item);
 };
 
 export const updateItem = async (id: string, updateData: Partial<Item>): Promise<Item> => {
@@ -321,7 +332,8 @@ export const updateItem = async (id: string, updateData: Partial<Item>): Promise
     body: JSON.stringify(updateData),
   });
   if (!response.ok) throw new Error("Failed to update item");
-  return response.json();
+  const item = await response.json();
+  return normalizeItem(item);
 };
 
 export const deleteItem = async (id: string): Promise<void> => {
@@ -341,7 +353,8 @@ export const fetchUserItems = async (): Promise<Item[]> => {
     headers: getAuthHeaders(),
   });
   if (!response.ok) throw new Error("Failed to fetch your items");
-  return response.json();
+  const items = await response.json();
+  return items.map(normalizeItem);
 };
 
 // Borrow Request API

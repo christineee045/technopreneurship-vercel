@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { Search, Eye, Trash2, Star, MoreVertical } from "lucide-react";
+import { Search, Eye, Trash2, Star, MoreVertical, BadgeCheck, Check, ChevronDown, ChevronRight } from "lucide-react";
 import { AdminHeader } from "../components/AdminHeader";
 import { AdminSidebar } from "../components/AdminSidebar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
@@ -27,36 +27,33 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../components/ui/dialog";
-import { approveAdminListing, fetchAdminListings, rejectAdminListing, type AdminListing } from "../services/admin-api";
+import {
+  approveAdminListing,
+  deleteItemReview,
+  deleteAdminListing,
+  fetchAdminBorrowRequests,
+  fetchAdminListings,
+  fetchItemReviews,
+  rejectAdminListing,
+  setAdminListingFeatured,
+  type AdminBorrowRequest,
+  type AdminItemReview,
+  type AdminListing,
+} from "../services/admin-api";
 import { toast } from "sonner";
-
-const FEATURED_OVERRIDES_KEY = "lendlyFeaturedOverrides";
-
-const loadFeaturedOverrides = () => {
-  if (typeof window === "undefined") {
-    return {} as Record<string, boolean>;
-  }
-  try {
-    const raw = localStorage.getItem(FEATURED_OVERRIDES_KEY);
-    return raw ? (JSON.parse(raw) as Record<string, boolean>) : {};
-  } catch {
-    return {} as Record<string, boolean>;
-  }
-};
-
-const persistFeaturedOverride = (listingId: string, isFeatured: boolean) => {
-  if (typeof window === "undefined") return;
-  const overrides = loadFeaturedOverrides();
-  overrides[listingId] = isFeatured;
-  localStorage.setItem(FEATURED_OVERRIDES_KEY, JSON.stringify(overrides));
-};
 
 export default function ListingsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [listings, setListings] = useState<AdminListing[]>([]);
+  const [requests, setRequests] = useState<AdminBorrowRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedListing, setSelectedListing] = useState<AdminListing | null>(null);
+  const [selectedListingReviews, setSelectedListingReviews] = useState<AdminItemReview[]>([]);
+  const [isDetailLoading, setIsDetailLoading] = useState(false);
+  const [isTransactionsOpen, setIsTransactionsOpen] = useState(false);
+  const [isReviewsOpen, setIsReviewsOpen] = useState(false);
+  const [showAllReviews, setShowAllReviews] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<AdminListing | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
@@ -64,16 +61,23 @@ export default function ListingsPage() {
     const loadListings = async () => {
       try {
         setIsLoading(true);
-        const data = await fetchAdminListings();
-        const overrides = loadFeaturedOverrides();
-        const withOverrides = data.map((listing) => {
-          const override = overrides[listing.id];
-          if (typeof override === "boolean") {
-            return { ...listing, featured: override };
-          }
-          return listing;
-        });
-        setListings(withOverrides);
+        const [listingsResult, requestsResult] = await Promise.allSettled([
+          fetchAdminListings(),
+          fetchAdminBorrowRequests(),
+        ]);
+
+        if (listingsResult.status === "rejected") {
+          throw listingsResult.reason;
+        }
+
+        setListings([...listingsResult.value].sort((left, right) => new Date(right.createdDate).getTime() - new Date(left.createdDate).getTime()));
+
+        if (requestsResult.status === "fulfilled") {
+          setRequests(requestsResult.value);
+        } else {
+          console.error("Failed to load transaction history:", requestsResult.reason);
+          toast.error("Loaded listings but failed to load transaction history");
+        }
       } catch (error) {
         console.error("Failed to load listings:", error);
         toast.error("Failed to load listings");
@@ -84,15 +88,62 @@ export default function ListingsPage() {
     loadListings();
   }, []);
 
+  useEffect(() => {
+    const loadItemReviews = async () => {
+      if (!selectedListing || normalizeListingStatus(selectedListing.status) !== "approved") {
+        setSelectedListingReviews([]);
+        return;
+      }
+
+      try {
+        setIsDetailLoading(true);
+        const reviews = await fetchItemReviews(selectedListing.id);
+        setSelectedListingReviews(reviews);
+      } catch (error) {
+        console.error("Failed to load item reviews:", error);
+        toast.error("Failed to load item reviews");
+        setSelectedListingReviews([]);
+      } finally {
+        setIsDetailLoading(false);
+      }
+    };
+
+    loadItemReviews();
+  }, [selectedListing]);
+
+  useEffect(() => {
+    setIsTransactionsOpen(false);
+    setIsReviewsOpen(false);
+    setShowAllReviews(false);
+  }, [selectedListing?.id]);
+
   const filteredListings = useMemo(() => {
-    return listings.filter((listing) => {
-      const matchesSearch =
-        listing.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        listing.owner.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesStatus = statusFilter === "all" || listing.status === statusFilter;
-      return matchesSearch && matchesStatus;
-    });
+    return [...listings]
+      .sort((left, right) => new Date(right.createdDate).getTime() - new Date(left.createdDate).getTime())
+      .filter((listing) => {
+        const matchesSearch =
+          listing.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          listing.owner.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesStatus =
+          statusFilter === "all"
+            ? true
+            : statusFilter === "featured"
+              ? listing.featured
+              : listing.status === statusFilter;
+        return matchesSearch && matchesStatus;
+      });
   }, [listings, searchQuery, statusFilter]);
+
+  const selectedListingTransactions = useMemo(() => {
+    if (!selectedListing) return [];
+    return requests
+      .filter((request) => request.itemId === selectedListing.id)
+      .sort((left, right) => {
+        const leftDate = new Date(left.returnedAt || left.createdAt).getTime();
+        const rightDate = new Date(right.returnedAt || right.createdAt).getTime();
+        return rightDate - leftDate;
+      });
+  }, [requests, selectedListing]);
 
   const normalizeListingStatus = (status?: string) => {
     if (status === "approved" || status === "pending" || status === "rejected") {
@@ -108,10 +159,17 @@ export default function ListingsPage() {
       : normalizedStatus.charAt(0).toUpperCase() + normalizedStatus.slice(1);
   };
 
+  const selectedListingIsApproved = selectedListing ? normalizeListingStatus(selectedListing.status) === "approved" : false;
+
+  const updateListingInState = (listingId: string, updater: (listing: AdminListing) => AdminListing) => {
+    setListings((currentListings) => currentListings.map((listing) => (listing.id === listingId ? updater(listing) : listing)));
+  };
+
   const handleApprove = async (listingId: string, title: string) => {
     try {
       const updated = await approveAdminListing(listingId);
-      setListings(listings.map((l) => (l.id === listingId ? { ...l, status: updated.status } : l)));
+      updateListingInState(listingId, (listing) => ({ ...listing, status: updated.status }));
+      setSelectedListing((current) => (current?.id === listingId ? { ...current, status: updated.status } : current));
       toast.success(`Listing "${title}" has been approved for publication`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to approve listing");
@@ -121,23 +179,63 @@ export default function ListingsPage() {
   const handleReject = async (listingId: string, title: string) => {
     try {
       const updated = await rejectAdminListing(listingId);
-      setListings(listings.map((l) => (l.id === listingId ? { ...l, status: updated.status } : l)));
+      updateListingInState(listingId, (listing) => ({ ...listing, status: updated.status }));
+      setSelectedListing((current) => (current?.id === listingId ? { ...current, status: updated.status } : current));
       toast.info(`Listing "${title}" has been rejected`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to reject listing");
     }
   };
 
-  const handleMarkFeatured = (listingId: string, title: string, isFeatured: boolean) => {
-    const nextFeatured = !isFeatured;
-    setListings(listings.map((l) => (l.id === listingId ? { ...l, featured: nextFeatured } : l)));
-    persistFeaturedOverride(listingId, nextFeatured);
-    toast.success(`Listing "${title}" is now ${!isFeatured ? "featured" : "unfeatured"}`);
+  const handleApproveAndFeature = async (listingId: string, title: string) => {
+    try {
+      const approved = await approveAdminListing(listingId);
+      updateListingInState(listingId, (listing) => ({ ...listing, status: approved.status }));
+      setSelectedListing((current) => (current?.id === listingId ? { ...current, status: approved.status } : current));
+
+      const featured = await setAdminListingFeatured(listingId, true);
+      updateListingInState(listingId, (listing) => ({ ...listing, featured: Boolean(featured.featured) }));
+      setSelectedListing((current) => (current?.id === listingId ? { ...current, featured: Boolean(featured.featured) } : current));
+
+      toast.success(`Listing "${title}" has been approved and featured`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to approve and feature listing");
+    }
   };
 
-  const handleDeleteListing = (listingId: string, title: string) => {
-    setListings(listings.filter((l) => l.id !== listingId));
-    toast.error(`Listing "${title}" has been removed`);
+  const handleMarkFeatured = async (listingId: string, title: string, isFeatured: boolean) => {
+    const nextFeatured = !isFeatured;
+    try {
+      const updated = await setAdminListingFeatured(listingId, nextFeatured);
+      updateListingInState(listingId, (listing) => ({ ...listing, featured: Boolean(updated.featured) }));
+      setSelectedListing((current) => (current?.id === listingId ? { ...current, featured: Boolean(updated.featured) } : current));
+      toast.success(`Listing "${title}" is now ${nextFeatured ? "featured" : "unfeatured"}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update featured status");
+    }
+  };
+
+  const handleDeleteListing = async (listingId: string, title: string) => {
+    try {
+      await deleteAdminListing(listingId);
+      setListings((currentListings) => currentListings.filter((listing) => listing.id !== listingId));
+      if (selectedListing?.id === listingId) {
+        setSelectedListing(null);
+      }
+      toast.error(`Listing "${title}" has been removed`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to delete listing");
+    }
+  };
+
+  const handleDeleteReview = async (reviewId: string) => {
+    try {
+      await deleteItemReview(reviewId);
+      setSelectedListingReviews((currentReviews) => currentReviews.filter((review) => review.id !== reviewId));
+      toast.success("Review deleted successfully");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to delete review");
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -211,12 +309,14 @@ export default function ListingsPage() {
                   />
                 </div>
                 <div className="flex gap-2 flex-wrap">
-                  {['all', 'approved', 'pending', 'rejected'].map((status) => (
+                  {['all', 'approved', 'pending', 'rejected', 'featured'].map((status) => (
                     <Button
                       key={status}
                       variant={statusFilter === status ? "default" : "outline"}
-                      onClick={() => setStatusFilter(status)}
-                      className={statusFilter === status ? "bg-primary hover:bg-primary/90" : ""}
+                      onClick={() => {
+                        setStatusFilter(status);
+                      }}
+                      className={statusFilter === status ? (status === 'featured' ? "bg-amber-500 hover:bg-amber-600" : "bg-primary hover:bg-primary/90") : ""}
                     >
                       {status.charAt(0).toUpperCase() + status.slice(1)}
                     </Button>
@@ -380,14 +480,14 @@ export default function ListingsPage() {
           )}
 
           <Dialog open={Boolean(selectedListing)} onOpenChange={(open) => !open && setSelectedListing(null)}>
-            <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+            <DialogContent className="max-w-7xl max-h-[85vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Listing Details</DialogTitle>
                 <DialogDescription>Detailed listing preview for admin review.</DialogDescription>
               </DialogHeader>
               {selectedListing && (
                 <div className="flex flex-row gap-6">
-                  <div className="space-y-4 w-5/12">
+                  <div className="space-y-4 w-8/12">
                     <div className="w-full h-56 bg-muted rounded-lg overflow-hidden">
                       <img
                         src={selectedListing.image}
@@ -400,9 +500,123 @@ export default function ListingsPage() {
                       <p className="text-lg font-semibold">{selectedListing.title}</p>
                       <p className="text-xs text-muted-foreground">ID: {selectedListing.id}</p>
                     </div>
+
+                    {selectedListingIsApproved && (
+                      <>
+                        <div className="rounded-lg border p-3">
+                          <button
+                            type="button"
+                            className="w-full flex items-center justify-between"
+                            onClick={() => setIsTransactionsOpen((current) => !current)}
+                          >
+                            <p className="text-xs text-muted-foreground text-left">Transaction History</p>
+                            {isTransactionsOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                          </button>
+                          {isTransactionsOpen && (
+                            <div className="mt-3 space-y-3">
+                              {selectedListingTransactions.length === 0 ? (
+                                <p className="text-sm text-muted-foreground">No transactions found for this item.</p>
+                              ) : (
+                                (() => {
+                                  const latestTransaction = selectedListingTransactions[0];
+                                  if (!latestTransaction) return null;
+                                  return (
+                                    <div className="rounded-md border p-3 bg-muted/20 space-y-2">
+                                      <div className="flex items-center justify-between gap-3">
+                                        <div>
+                                          <p className="font-semibold text-sm">{latestTransaction.borrower}</p>
+                                          <p className="text-xs text-muted-foreground">
+                                            {new Date(latestTransaction.startDate).toLocaleDateString()} to {new Date(latestTransaction.endDate).toLocaleDateString()}
+                                          </p>
+                                        </div>
+                                        <Badge className={getStatusColor(latestTransaction.status)}>{latestTransaction.status}</Badge>
+                                      </div>
+                                      <p className="text-xs text-muted-foreground">
+                                        Requested: {new Date(latestTransaction.createdAt).toLocaleDateString()}
+                                        {latestTransaction.returnedAt ? ` · Returned: ${new Date(latestTransaction.returnedAt).toLocaleDateString()}` : ""}
+                                      </p>
+                                      {latestTransaction.reportReason && (
+                                        <p className="text-xs text-rose-700">Report: {latestTransaction.reportReason}</p>
+                                      )}
+                                      {latestTransaction.borrowerFeedback && (
+                                        <p className="text-xs text-muted-foreground">Feedback: {latestTransaction.borrowerFeedback}</p>
+                                      )}
+                                    </div>
+                                  );
+                                })()
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="rounded-lg border p-3">
+                          <button
+                            type="button"
+                            className="w-full flex items-center justify-between"
+                            onClick={() => setIsReviewsOpen((current) => !current)}
+                          >
+                            <p className="text-xs text-muted-foreground text-left">Reviews</p>
+                            {isReviewsOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                          </button>
+                          {isReviewsOpen && (
+                            <div className="mt-3 space-y-3">
+                              {isDetailLoading ? (
+                                <p className="text-sm text-muted-foreground">Loading reviews...</p>
+                              ) : selectedListingReviews.length === 0 ? (
+                                <p className="text-sm text-muted-foreground">No reviews found for this item.</p>
+                              ) : (
+                                selectedListingReviews.slice(0, showAllReviews ? selectedListingReviews.length : 3).map((review) => (
+                                  <div key={review.id} className="rounded-md border p-3 bg-muted/20 space-y-2">
+                                    <div className="flex items-center justify-between gap-3">
+                                      <div>
+                                        <p className="font-semibold text-sm">{review.reviewerName}</p>
+                                        <p className="text-xs text-muted-foreground">{new Date(review.createdAt).toLocaleDateString()}</p>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <Badge variant="outline">{review.rating}⭐</Badge>
+                                        <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                                              <MoreVertical className="h-4 w-4" />
+                                            </Button>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent align="end">
+                                            <DropdownMenuItem
+                                              className="text-destructive"
+                                              onClick={() => handleDeleteReview(review.id)}
+                                            >
+                                              <Trash2 className="h-4 w-4 mr-2" />
+                                              Delete Review
+                                            </DropdownMenuItem>
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
+                                      </div>
+                                    </div>
+                                    <p className="text-sm text-muted-foreground">{review.comment}</p>
+                                    {review.ownerReply && (
+                                      <p className="text-xs text-green-700">Owner reply: {review.ownerReply}</p>
+                                    )}
+                                  </div>
+                                ))
+                              )}
+                              {selectedListingReviews.length > 3 && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="w-full"
+                                  onClick={() => setShowAllReviews((current) => !current)}
+                                >
+                                  {showAllReviews ? "Show Less" : "Show More"}
+                                </Button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
 
-                  <div className="space-y-4 w-7/12">
+                  <div className="space-y-4 w-4/12">
                     <div className="rounded-lg border p-3">
                       <p className="text-xs text-muted-foreground">Owner</p>
                       <p className="font-semibold">{selectedListing.owner}</p>
@@ -426,6 +640,43 @@ export default function ListingsPage() {
                       <p className="text-xs text-muted-foreground">Featured</p>
                       <p className="font-semibold">{selectedListing.featured ? "Yes" : "No"}</p>
                     </div>
+
+                    <div className="flex flex-wrap gap-2 pt-2">
+                      {selectedListing.status === "pending" && (
+                        <>
+                          <Button onClick={() => handleApprove(selectedListing.id, selectedListing.title)}>
+                            <Check className="h-4 w-4 mr-2" />
+                            Approve
+                          </Button>
+                          <Button variant="outline" onClick={() => handleApproveAndFeature(selectedListing.id, selectedListing.title)}>
+                            <BadgeCheck className="h-4 w-4 mr-2" />
+                            Approve & Feature
+                          </Button>
+                          <Button variant="outline" onClick={() => handleReject(selectedListing.id, selectedListing.title)}>
+                            Reject
+                          </Button>
+                        </>
+                      )}
+
+                      {selectedListing.status === "approved" && (
+                        <Button variant="outline" onClick={() => handleMarkFeatured(selectedListing.id, selectedListing.title, selectedListing.featured)}>
+                          <Star className="h-4 w-4 mr-2" />
+                          {selectedListing.featured ? "Remove Featured" : "Mark Featured"}
+                        </Button>
+                      )}
+
+                      <Button
+                        variant="destructive"
+                        onClick={() => {
+                          setDeleteTarget(selectedListing);
+                          setSelectedListing(null);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </Button>
+                    </div>
+
                   </div>
                 </div>
               )}

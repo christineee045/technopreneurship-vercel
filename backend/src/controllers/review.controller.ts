@@ -2,7 +2,14 @@ import type { Request, Response } from "express";
 import Item from "../models/Item";
 import BorrowRequest from "../models/BorrowRequest";
 import User from "../models/User";
-import { createReview, getReviewsByItemId, getReviewsByOwnerId, getReviewsByReviewerId, replyToReview, deleteReview } from "../services/review.service";
+import {
+  createReview,
+  deleteReview,
+  getReviewsByItemId,
+  getReviewsByOwnerId,
+  getReviewsByReviewerId,
+  replyToReview,
+} from "../services/review.service";
 
 export const createReviewHandler = async (req: Request, res: Response): Promise<void> => {
   try {

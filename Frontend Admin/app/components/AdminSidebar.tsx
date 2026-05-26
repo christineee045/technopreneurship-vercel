@@ -7,6 +7,7 @@ import {
   AlertCircle,
   Flag,
   TrendingUp,
+  MessageSquare,
   ChevronLeft,
   ChevronRight,
   List,
@@ -30,6 +31,11 @@ const navItems = [
     label: "Listings",
     icon: Package,
     path: "/admin/listings",
+  },
+  {
+    label: "Reviews",
+    icon: MessageSquare,
+    path: "/admin/reviews",
   },
   {
     label: "Requests",

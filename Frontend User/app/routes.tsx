@@ -11,6 +11,7 @@ import UserProfile from "./pages/UserProfile";
 import AdminDashboard from "../../Frontend Admin/app/pages/AdminDashboard";
 import UsersPage from "../../Frontend Admin/app/pages/UsersPage";
 import ListingsPage from "../../Frontend Admin/app/pages/ListingsPage";
+import ReviewsPage from "../../Frontend Admin/app/pages/ReviewsPage";
 import RequestsPage from "../../Frontend Admin/app/pages/RequestsPage";
 import OverduePage from "../../Frontend Admin/app/pages/OverduePage";
 import DisputesPage from "../../Frontend Admin/app/pages/DisputesPage";
@@ -148,6 +149,14 @@ export const router = createBrowserRouter([
     Component: () => (
       <RequireAdmin>
         <ListingsPage />
+      </RequireAdmin>
+    ),
+  },
+  {
+    path: "/admin/reviews",
+    Component: () => (
+      <RequireAdmin>
+        <ReviewsPage />
       </RequireAdmin>
     ),
   },

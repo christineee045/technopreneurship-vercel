@@ -4,6 +4,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import AdminLoginPage from "./pages/AdminLoginPage";
 import UsersPage from "./pages/UsersPage";
 import ListingsPage from "./pages/ListingsPage";
+import ReviewsPage from "./pages/ReviewsPage";
 import RequestsPage from "./pages/RequestsPage";
 import OverduePage from "./pages/OverduePage";
 import DisputesPage from "./pages/DisputesPage";
@@ -43,6 +44,14 @@ export const adminRouter = createBrowserRouter([
     Component: () => (
       <RequireAdmin>
         <ListingsPage />
+      </RequireAdmin>
+    ),
+  },
+  {
+    path: "/admin/reviews",
+    Component: () => (
+      <RequireAdmin>
+        <ReviewsPage />
       </RequireAdmin>
     ),
   },

@@ -18,6 +18,7 @@ export interface IReview extends Document {
   ownerName: string;
   rating: number;
   comment: string;
+  isHidden: boolean;
   ownerReply?: string;
   ownerReplyAt?: Date;
   replies: IReviewReply[];
@@ -47,6 +48,7 @@ const reviewSchema = new Schema<IReview>(
     ownerName: { type: String, required: true },
     rating: { type: Number, required: true, min: 1, max: 5 },
     comment: { type: String, required: true, trim: true },
+    isHidden: { type: Boolean, default: false },
     ownerReply: { type: String, trim: true },
     ownerReplyAt: { type: Date },
     replies: { type: [reviewReplySchema], default: [] },

@@ -12,6 +12,11 @@ import {
   getDashboard,
   approveListing,
   rejectListing,
+  updateListingFeatured,
+  deleteListing,
+  getReviews,
+  updateReviewVisibility,
+  deleteReview,
 } from "../controllers/admin.controller";
 import { authenticateToken, requireAdmin } from "../middleware/auth";
 
@@ -23,6 +28,8 @@ router.get("/users", getUsers);
 router.get("/listings", getListings);
 router.post("/listings/:id/approve", approveListing);
 router.post("/listings/:id/reject", rejectListing);
+router.patch("/listings/:id/featured", updateListingFeatured);
+router.delete("/listings/:id", deleteListing);
 router.get("/borrow-requests", getBorrowRequests);
 router.get("/overdue-items", getOverdueItems);
 router.get("/disputes", getDisputes);
@@ -31,5 +38,8 @@ router.get("/borrow-volume", getBorrowVolumeDataController);
 router.get("/top-lenders", getTopLendersController);
 router.get("/stats", getStats);
 router.get("/dashboard", getDashboard);
+router.get("/reviews", getReviews);
+router.patch("/reviews/:reviewId/visibility", updateReviewVisibility);
+router.delete("/reviews/:reviewId", deleteReview);
 
 export default router;

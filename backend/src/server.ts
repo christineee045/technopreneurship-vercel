@@ -1,6 +1,7 @@
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
+import { resolve } from "path";
 
 import connectDB from "./config/db";
 import authRoutes from "./routes/auth.routes";
@@ -12,7 +13,7 @@ import adminRoutes from "./routes/admin.routes";
 import notificationRoutes from "./routes/notification.routes";
 import Notification from "./models/Notification";
 
-dotenv.config();
+dotenv.config({ path: resolve(__dirname, "../.env") });
 
 connectDB();
 

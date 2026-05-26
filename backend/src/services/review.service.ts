@@ -3,6 +3,8 @@ import Item from "../models/Item";
 import User from "../models/User";
 import { createNotification } from "./notification.service";
 
+const visibleReviewFilter = { isHidden: { $ne: true } };
+
 const populateReviewAvatars = async (reviews: IReview[]): Promise<IReview[]> => {
   const userIds = new Set<string>();
 
@@ -40,7 +42,7 @@ const populateReviewAvatars = async (reviews: IReview[]): Promise<IReview[]> => 
 };
 
 export const getOwnerReviewStats = async (ownerId: string): Promise<{ reviewCount: number; rating: number }> => {
-  const ownerReviews = await Review.find({ ownerId });
+  const ownerReviews = await Review.find({ ownerId, ...visibleReviewFilter });
   const reviewCount = ownerReviews.length;
   const averageRating =
     reviewCount === 0
@@ -53,34 +55,53 @@ export const getOwnerReviewStats = async (ownerId: string): Promise<{ reviewCoun
   };
 };
 
-export const createReview = async (reviewData: Partial<IReview>): Promise<IReview> => {
-  const review = await Review.create(reviewData);
+const recalculateOwnerReviewStats = async (ownerId: string) => {
+  const { reviewCount, rating } = await getOwnerReviewStats(ownerId);
 
-  const { reviewCount, rating: roundedAverage } = await getOwnerReviewStats(review.ownerId);
-
-  await User.findByIdAndUpdate(review.ownerId, {
-    rating: roundedAverage,
+  await User.findByIdAndUpdate(ownerId, {
+    rating,
     reviewCount,
   });
 
-  await Item.updateMany({ ownerId: review.ownerId }, { ownerRating: roundedAverage });
+  await Item.updateMany({ ownerId }, { ownerRating: rating });
+};
+
+export const createReview = async (reviewData: Partial<IReview>): Promise<IReview> => {
+  const review = await Review.create(reviewData);
+
+  await recalculateOwnerReviewStats(review.ownerId);
 
   return review;
 };
 
 export const getReviewsByOwnerId = async (ownerId: string): Promise<IReview[]> => {
-  const reviews = await Review.find({ ownerId }).sort({ createdAt: -1 });
+  const reviews = await Review.find({ ownerId, ...visibleReviewFilter }).sort({ createdAt: -1 });
   return populateReviewAvatars(reviews);
 };
 
 export const getReviewsByReviewerId = async (reviewerId: string): Promise<IReview[]> => {
-  const reviews = await Review.find({ reviewerId }).sort({ createdAt: -1 });
+  const reviews = await Review.find({ reviewerId, ...visibleReviewFilter }).sort({ createdAt: -1 });
   return populateReviewAvatars(reviews);
 };
 
 export const getReviewsByItemId = async (itemId: string): Promise<IReview[]> => {
-  const reviews = await Review.find({ itemId }).sort({ createdAt: -1 });
+  const reviews = await Review.find({ itemId, ...visibleReviewFilter }).sort({ createdAt: -1 });
   return populateReviewAvatars(reviews);
+};
+
+export const getAllReviews = async (): Promise<Array<IReview & { category?: string }>> => {
+  const [reviews, items] = await Promise.all([
+    Review.find().sort({ createdAt: -1 }),
+    Item.find().select("category").lean(),
+  ]);
+
+  const categoryByItemId = new Map(items.map((item: any) => [item._id.toString(), item.category || ""]));
+  const withAvatars = await populateReviewAvatars(reviews);
+
+  return withAvatars.map((review) => ({
+    ...review,
+    category: categoryByItemId.get(review.itemId) || "",
+  }));
 };
 
 export const replyToReview = async (
@@ -139,16 +160,21 @@ export const deleteReview = async (reviewId: string): Promise<boolean> => {
   await Review.findByIdAndDelete(reviewId);
 
   // Recalculate the owner's rating and review count based on remaining reviews
-  const { reviewCount, rating: roundedAverage } = await getOwnerReviewStats(ownerId);
-
-  // Update the owner's rating and reviewCount
-  await User.findByIdAndUpdate(ownerId, {
-    rating: roundedAverage,
-    reviewCount,
-  });
-
-  // Update all items owned by this user with the new ownerRating
-  await Item.updateMany({ ownerId }, { ownerRating: roundedAverage });
+  await recalculateOwnerReviewStats(ownerId);
 
   return true;
+};
+
+export const updateReviewVisibility = async (reviewId: string, isHidden: boolean): Promise<IReview | null> => {
+  const review = await Review.findById(reviewId);
+  if (!review) {
+    return null;
+  }
+
+  review.isHidden = isHidden;
+  await review.save();
+
+  await recalculateOwnerReviewStats(review.ownerId);
+
+  return review;
 };

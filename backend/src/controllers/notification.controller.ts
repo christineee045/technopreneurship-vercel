@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import {
   createNotification,
   getNotificationsByUserId,
+  getNotificationsForAdmin,
   getUnreadCount,
   markAsRead,
   markAllAsRead,
@@ -37,6 +38,12 @@ export const getNotificationsHandler = async (req: Request, res: Response): Prom
     const user = (req as any).user;
     if (!user?.id) {
       res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    if (user?.isAdmin) {
+      const notifications = await getNotificationsForAdmin(user.id);
+      res.json(notifications);
       return;
     }
 
@@ -78,7 +85,7 @@ export const markAsReadHandler = async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    const notification = await markAsRead(notificationId, user.id);
+    const notification = await markAsRead(notificationId, user.id, Boolean(user.isAdmin));
     if (!notification) {
       res.status(404).json({ message: "Notification not found" });
       return;

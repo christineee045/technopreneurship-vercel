@@ -242,13 +242,46 @@ export default function AddListing() {
 
               <div className="space-y-2">
                 <Label htmlFor="location">Location *</Label>
-                <Input
-                  id="location"
-                  placeholder="e.g., Makati, Metro Manila"
-                  value={formData.location}
-                  onChange={(e) => setFormData({...formData, location: e.target.value})}
-                  required
-                />
+                <Select value={formData.location} onValueChange={(value) => setFormData({...formData, location: value})}>
+                  <SelectTrigger id="location">
+                    <SelectValue placeholder="Select location" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Manila">Manila</SelectItem>
+                    <SelectItem value="Quezon City">Quezon City</SelectItem>
+                    <SelectItem value="Angeles">Angeles</SelectItem>
+                    <SelectItem value="Bacolod">Bacolod</SelectItem>
+                    <SelectItem value="Baguio">Baguio</SelectItem>
+                    <SelectItem value="Butuan">Butuan</SelectItem>
+                    <SelectItem value="Cagayan de Oro">Cagayan de Oro</SelectItem>
+                    <SelectItem value="Caloocan">Caloocan</SelectItem>
+                    <SelectItem value="Cebu City">Cebu City</SelectItem>
+                    <SelectItem value="Davao City">Davao City</SelectItem>
+                    <SelectItem value="General Santos">General Santos</SelectItem>
+                    <SelectItem value="Iligan">Iligan</SelectItem>
+                    <SelectItem value="Iloilo City">Iloilo City</SelectItem>
+                    <SelectItem value="Lapu-Lapu">Lapu-Lapu</SelectItem>
+                    <SelectItem value="Las Piñas">Las Piñas</SelectItem>
+                    <SelectItem value="Lucena">Lucena</SelectItem>
+                    <SelectItem value="Makati">Makati</SelectItem>
+                    <SelectItem value="Malabon">Malabon</SelectItem>
+                    <SelectItem value="Mandaluyong">Mandaluyong</SelectItem>
+                    <SelectItem value="Mandaue">Mandaue</SelectItem>
+                    <SelectItem value="Marikina">Marikina</SelectItem>
+                    <SelectItem value="Muntinlupa">Muntinlupa</SelectItem>
+                    <SelectItem value="Navotas">Navotas</SelectItem>
+                    <SelectItem value="Olongapo">Olongapo</SelectItem>
+                    <SelectItem value="Parañaque">Parañaque</SelectItem>
+                    <SelectItem value="Pasay">Pasay</SelectItem>
+                    <SelectItem value="Pasig">Pasig</SelectItem>
+                    <SelectItem value="Puerto Princesa">Puerto Princesa</SelectItem>
+                    <SelectItem value="San Juan">San Juan</SelectItem>
+                    <SelectItem value="Tacloban">Tacloban</SelectItem>
+                    <SelectItem value="Taguig">Taguig</SelectItem>
+                    <SelectItem value="Valenzuela">Valenzuela</SelectItem>
+                    <SelectItem value="Zamboanga City">Zamboanga City</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </CardContent>
           </Card>

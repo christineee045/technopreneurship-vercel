@@ -8,7 +8,7 @@ import {
   getBorrowRequestsByOwnerId,
   updateBorrowRequest,
 } from "../services/borrow-request.service";
-import { createNotification as createNotif } from "../services/notification.service";
+import { createNotification as createNotif, notifyAdmins } from "../services/notification.service";
 
 const getRequestId = (value: unknown): string | undefined => {
   if (typeof value === "string") return value;
@@ -215,6 +215,8 @@ export const updateBorrowRequestHandler = async (req: Request, res: Response): P
       updateData.returnedAt = updateData.returnedAt || new Date().toISOString();
     }
 
+    
+
     const hasOwnerFeedback = updateData.borrowerRating !== undefined || updateData.borrowerFeedback !== undefined || updateData.reportReason !== undefined;
     if (hasOwnerFeedback && !isOwner && !isAdmin) {
       res.status(403).json({ message: "Only the item owner can add borrower feedback or reports" });
@@ -243,6 +245,37 @@ export const updateBorrowRequestHandler = async (req: Request, res: Response): P
     if (!request) {
       res.status(404).json({ message: "Borrow request not found after update" });
       return;
+    }
+
+    if (updateData.status === "Overdue") {
+      // Notify borrower that their borrow is overdue
+      await createNotif({
+        userId: request.borrowerId,
+        type: "system",
+        title: "Borrow Period Overdue",
+        message: `Your borrow of \"${request.itemTitle}\" is overdue. Please return the item or contact ${request.ownerName}.`,
+        referenceId: request._id?.toString(),
+        referenceType: "borrowRequest",
+      });
+
+      // Notify owner (lender) that item is overdue
+      await createNotif({
+        userId: request.ownerId,
+        type: "system",
+        title: "Item Overdue",
+        message: `${request.borrowerName} has not returned \"${request.itemTitle}\". Please follow up with the borrower.`,
+        referenceId: request._id?.toString(),
+        referenceType: "borrowRequest",
+      });
+
+      // Notify all admins (use a type admin UI maps to overdue)
+      await notifyAdmins({
+        type: "item_returned",
+        title: "Overdue Borrow Request",
+        message: `Borrow request for \"${request.itemTitle}\" by ${request.borrowerName} is overdue and requires attention.`,
+        referenceId: request._id?.toString(),
+        referenceType: "borrowRequest",
+      });
     }
 
     if (updateData.status === "Approved" || updateData.status === "Active") {
@@ -287,6 +320,14 @@ export const updateBorrowRequestHandler = async (req: Request, res: Response): P
     if (updateData.status === "Reported") {
       await createNotif({
         userId: request.borrowerId,
+        type: "system",
+        title: "Borrow Request Reported",
+        message: `${request.ownerName} reported an issue for \"${request.itemTitle}\". Admin review has been requested.`,
+        referenceId: request._id?.toString(),
+        referenceType: "borrowRequest",
+      });
+      // Also notify admins about the report
+      await notifyAdmins({
         type: "system",
         title: "Borrow Request Reported",
         message: `${request.ownerName} reported an issue for \"${request.itemTitle}\". Admin review has been requested.`,

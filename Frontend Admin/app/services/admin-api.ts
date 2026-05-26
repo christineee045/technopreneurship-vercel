@@ -1,5 +1,6 @@
 const API_BASE_URL = "http://localhost:5000/api/admin";
 const AUTH_BASE_URL = "http://localhost:5000/api/auth";
+const PUBLIC_API_BASE_URL = "http://localhost:5000/api";
 
 const ADMIN_TOKEN_KEY = "adminToken";
 
@@ -123,8 +124,36 @@ export interface AdminBorrowRequest {
   status: string;
   deposit: number;
   createdAt: string;
+  returnedAt?: string;
   message: string;
+  reportReason?: string;
+  borrowerRating?: number;
+  borrowerFeedback?: string;
 }
+
+export interface AdminItemReview {
+  _id?: string;
+  id: string;
+  itemId: string;
+  itemTitle: string;
+  category?: string;
+  reviewerId: string;
+  reviewerName: string;
+  reviewerAvatar?: string;
+  ownerId: string;
+  ownerName: string;
+  rating: number;
+  comment: string;
+  isHidden?: boolean;
+  ownerReply?: string;
+  ownerReplyAt?: string;
+  createdAt: string;
+}
+
+const normalizeAdminItemReview = (review: AdminItemReview): AdminItemReview => ({
+  ...review,
+  id: review.id || review._id || "",
+});
 
 // Overdue Item Type
 export interface OverdueItem {
@@ -149,7 +178,7 @@ export interface Dispute {
   defendant: string;
   defendantId: string;
   reportDate: string;
-  status: "Open" | "In Progress" | "Resolved" | "Escalated";
+  status: "Open" | "In Progress" | "Under Review" | "Contacted Parties" | "Waiting Response" | "Resolved" | "Rejected" | "Escalated";
   severity: "High" | "Medium" | "Low";
   description: string;
   adminNotes: string;
@@ -240,6 +269,88 @@ export const fetchAdminBorrowRequests = async (): Promise<AdminBorrowRequest[]> 
   return response.json();
 };
 
+export const fetchItemReviews = async (itemId: string): Promise<AdminItemReview[]> => {
+  const response = await fetch(`${PUBLIC_API_BASE_URL}/reviews/item/${itemId}`);
+  if (!response.ok) throw new Error("Failed to fetch item reviews");
+  const reviews = await response.json();
+  return reviews.map(normalizeAdminItemReview);
+};
+
+export const fetchAdminReviews = async (): Promise<AdminItemReview[]> => {
+  const response = await fetch(`${API_BASE_URL}/reviews`, {
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch admin reviews");
+  }
+
+  const reviews = await response.json();
+  return reviews.map(normalizeAdminItemReview);
+};
+
+export const updateAdminReviewVisibility = async (reviewId: string, isHidden: boolean): Promise<AdminItemReview> => {
+  const response = await fetch(`${API_BASE_URL}/reviews/${reviewId}/visibility`, {
+    method: "PATCH",
+    headers: getJsonHeaders(),
+    body: JSON.stringify({ isHidden }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to update review visibility");
+  }
+
+  const review = await response.json();
+  return normalizeAdminItemReview(review);
+};
+
+export const deleteAdminReview = async (reviewId: string): Promise<void> => {
+  const response = await fetch(`${API_BASE_URL}/reviews/${reviewId}`, {
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to delete review");
+  }
+};
+
+export const deleteItemReview = async (reviewId: string): Promise<void> => {
+  const response = await fetch(`${PUBLIC_API_BASE_URL}/reviews/${reviewId}`, {
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to delete review");
+  }
+};
+
+export const setAdminListingFeatured = async (id: string, isFeatured: boolean): Promise<AdminListing> => {
+  const response = await fetch(`${API_BASE_URL}/listings/${id}/featured`, {
+    method: "PATCH",
+    headers: getJsonHeaders(),
+    body: JSON.stringify({ isFeatured }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to update featured status");
+  }
+
+  return response.json();
+};
+
+export const deleteAdminListing = async (id: string): Promise<void> => {
+  const response = await fetch(`${API_BASE_URL}/listings/${id}`, {
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to delete listing");
+  }
+};
+
 export const fetchOverdueItems = async (): Promise<OverdueItem[]> => {
   const response = await fetch(`${API_BASE_URL}/overdue-items`, {
     headers: getAuthHeaders(),
@@ -253,6 +364,61 @@ export const fetchDisputes = async (): Promise<Dispute[]> => {
     headers: getAuthHeaders(),
   });
   if (!response.ok) throw new Error("Failed to fetch disputes");
+  return response.json();
+};
+
+// Update a borrow request (used to change dispute/admin workflow status)
+export const updateBorrowRequestStatus = async (borrowRequestId: string, status: string): Promise<any> => {
+  const response = await fetch(`${PUBLIC_API_BASE_URL}/borrow-requests/${borrowRequestId}`, {
+    method: "PUT",
+    headers: getJsonHeaders(),
+    body: JSON.stringify({ status }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.message || "Failed to update borrow request status");
+  }
+
+  return response.json();
+};
+
+// Generic update for borrow request (accepts any writable fields)
+export const updateBorrowRequest = async (borrowRequestId: string, payload: Record<string, any>): Promise<any> => {
+  const response = await fetch(`${PUBLIC_API_BASE_URL}/borrow-requests/${borrowRequestId}`, {
+    method: "PUT",
+    headers: getJsonHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.message || "Failed to update borrow request");
+  }
+
+  return response.json();
+};
+
+// Create a notification for a user (admin will call this when dispute status changes)
+export const createNotification = async (payload: {
+  userId: string;
+  type?: string;
+  title: string;
+  message: string;
+  referenceId?: string;
+  referenceType?: string;
+}): Promise<any> => {
+  const response = await fetch(`${PUBLIC_API_BASE_URL}/notifications`, {
+    method: "POST",
+    headers: getJsonHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.message || "Failed to create notification");
+  }
+
   return response.json();
 };
 

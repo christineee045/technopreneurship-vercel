@@ -1,4 +1,5 @@
 import Notification, { INotification } from "../models/Notification";
+import User from "../models/User";
 
 export const createNotification = async (data: {
   userId: string;
@@ -21,6 +22,11 @@ export const createNotification = async (data: {
 
 export const getNotificationsByUserId = async (userId: string): Promise<INotification[]> => {
   return Notification.find({ userId }).sort({ createdAt: -1 });
+};
+
+export const getNotificationsForAdmin = async (adminId: string): Promise<INotification[]> => {
+  // For admins we return notifications addressed to that admin user (created via notifyAdmins)
+  return Notification.find({ userId: adminId }).sort({ createdAt: -1 });
 };
 
 export const getUnreadCount = async (userId: string): Promise<number> => {
@@ -46,4 +52,28 @@ export const markAllAsRead = async (userId: string): Promise<number> => {
 export const deleteNotification = async (notificationId: string, userId: string): Promise<boolean> => {
   const result = await Notification.findOneAndDelete({ _id: notificationId, userId });
   return !!result;
+};
+
+export const notifyAdmins = async (data: {
+  type: INotification['type'];
+  title: string;
+  message: string;
+  referenceId?: string;
+  referenceType?: INotification['referenceType'];
+}): Promise<void> => {
+  const admins = await User.find({ isAdmin: true }).select("_id").lean();
+  if (!admins || admins.length === 0) return;
+
+  await Promise.all(
+    admins.map((a: any) =>
+      createNotification({
+        userId: a._id.toString(),
+        type: data.type,
+        title: data.title,
+        message: data.message,
+        referenceId: data.referenceId,
+        referenceType: data.referenceType,
+      })
+    )
+  );
 };

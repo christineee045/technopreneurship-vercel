@@ -17,6 +17,7 @@ export interface INotification extends Document {
   message: string;
   referenceId?: string; // e.g., borrow request ID, item ID
   referenceType?: 'borrowRequest' | 'item' | 'review';
+  meta?: any;
   read: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -58,6 +59,9 @@ const notificationSchema = new Schema<INotification>({
   referenceType: {
     type: String,
     enum: ['borrowRequest', 'item', 'review'],
+  },
+  meta: {
+    type: Schema.Types.Mixed,
   },
   read: {
     type: Boolean,

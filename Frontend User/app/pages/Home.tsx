@@ -18,7 +18,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
-  const [locationQuery, setLocationQuery] = useState("");
+  const [selectedLocation, setSelectedLocation] = useState("all");
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
   const { user } = useAuth();
@@ -49,7 +49,7 @@ export default function Home() {
                          item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          item.location.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === "all" || item.category === selectedCategory;
-    const matchesLocation = !locationQuery || item.location.toLowerCase().includes(locationQuery.toLowerCase());
+    const matchesLocation = selectedLocation === "all" || item.location === selectedLocation;
     const min = minPrice ? Number(minPrice) : undefined;
     const max = maxPrice ? Number(maxPrice) : undefined;
     const matchesMinPrice = min === undefined || item.rentalFeePerDay >= min;
@@ -60,11 +60,13 @@ export default function Home() {
   const isSearching =
     searchQuery.trim() !== "" ||
     selectedCategory !== "all" ||
-    locationQuery.trim() !== "" ||
+    selectedLocation !== "all" ||
     minPrice.trim() !== "" ||
     maxPrice.trim() !== "";
 
   const featuredItems = items.filter(item => item.isFeatured);
+
+  const getItemKey = (item: Item, index: number) => item.id || item._id || `${item.title}-${item.ownerId}-${index}`;
 
   if (isLoading) {
     return (
@@ -122,12 +124,47 @@ export default function Home() {
             </div>
 
             <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-2xl mx-auto">
-              <Input
-                placeholder="Filter by location"
-                value={locationQuery}
-                onChange={(e) => setLocationQuery(e.target.value)}
-                className="h-12 bg-muted/40 border-border/90 shadow-sm"
-              />
+              <Select value={selectedLocation} onValueChange={setSelectedLocation}>
+                <SelectTrigger className="h-12 w-full bg-muted/40 border-border/90 shadow-sm">
+                  <SelectValue placeholder="Location" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Locations</SelectItem>
+                  <SelectItem value="Manila">Manila</SelectItem>
+                  <SelectItem value="Quezon City">Quezon City</SelectItem>
+                  <SelectItem value="Angeles">Angeles</SelectItem>
+                  <SelectItem value="Bacolod">Bacolod</SelectItem>
+                  <SelectItem value="Baguio">Baguio</SelectItem>
+                  <SelectItem value="Butuan">Butuan</SelectItem>
+                  <SelectItem value="Cagayan de Oro">Cagayan de Oro</SelectItem>
+                  <SelectItem value="Caloocan">Caloocan</SelectItem>
+                  <SelectItem value="Cebu City">Cebu City</SelectItem>
+                  <SelectItem value="Davao City">Davao City</SelectItem>
+                  <SelectItem value="General Santos">General Santos</SelectItem>
+                  <SelectItem value="Iligan">Iligan</SelectItem>
+                  <SelectItem value="Iloilo City">Iloilo City</SelectItem>
+                  <SelectItem value="Lapu-Lapu">Lapu-Lapu</SelectItem>
+                  <SelectItem value="Las Piñas">Las Piñas</SelectItem>
+                  <SelectItem value="Lucena">Lucena</SelectItem>
+                  <SelectItem value="Makati">Makati</SelectItem>
+                  <SelectItem value="Malabon">Malabon</SelectItem>
+                  <SelectItem value="Mandaluyong">Mandaluyong</SelectItem>
+                  <SelectItem value="Mandaue">Mandaue</SelectItem>
+                  <SelectItem value="Marikina">Marikina</SelectItem>
+                  <SelectItem value="Muntinlupa">Muntinlupa</SelectItem>
+                  <SelectItem value="Navotas">Navotas</SelectItem>
+                  <SelectItem value="Olongapo">Olongapo</SelectItem>
+                  <SelectItem value="Parañaque">Parañaque</SelectItem>
+                  <SelectItem value="Pasay">Pasay</SelectItem>
+                  <SelectItem value="Pasig">Pasig</SelectItem>
+                  <SelectItem value="Puerto Princesa">Puerto Princesa</SelectItem>
+                  <SelectItem value="San Juan">San Juan</SelectItem>
+                  <SelectItem value="Tacloban">Tacloban</SelectItem>
+                  <SelectItem value="Taguig">Taguig</SelectItem>
+                  <SelectItem value="Valenzuela">Valenzuela</SelectItem>
+                  <SelectItem value="Zamboanga City">Zamboanga City</SelectItem>
+                </SelectContent>
+              </Select>
               <Input
                 type="number"
                 min="0"
@@ -187,8 +224,8 @@ export default function Home() {
               <h2 className="text-2xl font-semibold">Featured Items</h2>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {featuredItems.map(item => (
-                <ItemCard key={item.id} item={item} />
+              {featuredItems.map((item, index) => (
+                <ItemCard key={getItemKey(item, index)} item={item} />
               ))}
             </div>
           </div>
@@ -221,7 +258,7 @@ export default function Home() {
                 onClick={() => {
                   setSearchQuery("");
                   setSelectedCategory("all");
-                  setLocationQuery("");
+                      setSelectedLocation("all");
                   setMinPrice("");
                   setMaxPrice("");
                 }}
@@ -231,8 +268,8 @@ export default function Home() {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredItems.map(item => (
-                <ItemCard key={item.id} item={item} />
+              {filteredItems.map((item, index) => (
+                <ItemCard key={getItemKey(item, index)} item={item} />
               ))}
             </div>
           )}

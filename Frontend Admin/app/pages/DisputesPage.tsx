@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Flag, MessageSquare, CheckCircle, AlertTriangle, MoreVertical } from "lucide-react";
 import { AdminHeader } from "../components/AdminHeader";
@@ -22,7 +23,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../components/ui/dropdown-menu";
-import { fetchDisputes, type Dispute } from "../services/admin-api";
+import { fetchDisputes, updateBorrowRequestStatus, updateBorrowRequest, createNotification, type Dispute } from "../services/admin-api";
 import { toast } from "sonner";
 
 export default function DisputesPage() {
@@ -48,26 +49,227 @@ export default function DisputesPage() {
   const [selectedDispute, setSelectedDispute] = useState<string | null>(null);
   const [adminNotes, setAdminNotes] = useState("");
 
+  const IN_PROGRESS_STATUSES = ["In Progress", "Under Review", "Contacted Parties", "Waiting Response"];
+
   const filteredDisputes = disputes.filter((dispute) => {
     if (statusFilter === "all") return true;
+    if (statusFilter === "In Progress") return IN_PROGRESS_STATUSES.includes(dispute.status);
     return dispute.status === statusFilter;
   });
 
-  const handleAddNote = (disputeId: string, notes: string) => {
-    setDisputes(disputes.map((d) => (d.id === disputeId ? { ...d, adminNotes: notes } : d)));
+  const handleAddNote = async (disputeId: string, notes: string) => {
+    if (!notes || !notes.trim()) {
+      toast.error("Note cannot be empty");
+      return;
+    }
+
+    const dispute = disputes.find((d) => d.id === disputeId);
+    if (!dispute) return;
+    const requestId = dispute.id.replace(/^D-/, "");
+
+    // existing notes stored as paragraphs separated by double newline
+    const existing = dispute.adminNotes || "";
+    const parts = existing ? existing.split("\n\n") : [];
+    const last = parts.length ? parts[parts.length - 1] : "";
+    const lastText = last.includes("— ") ? last.split("— ").slice(1).join("— ").trim() : last.trim();
+
+    if (lastText === notes.trim()) {
+      setAdminNotes("");
+      setSelectedDispute(null);
+      toast("Duplicate note not added");
+      return;
+    }
+
+    const timestamp = new Date().toLocaleString();
+    const fullNote = `${timestamp} — ${notes.trim()}`;
+    const updatedNotes = existing ? `${existing}\n\n${fullNote}` : fullNote;
+
+    // optimistic UI update
+    setDisputes((prev) => prev.map((d) => (d.id === disputeId ? { ...d, adminNotes: updatedNotes } : d)));
     setAdminNotes("");
     setSelectedDispute(null);
     toast.success("Notes added to dispute");
+
+    try {
+      // persist as borrowerFeedback (backend maps borrowerFeedback to adminNotes in demo services)
+      await updateBorrowRequest(requestId, { borrowerFeedback: updatedNotes });
+    } catch (err) {
+      console.error("Failed to save admin notes:", err);
+      toast.error("Failed to save notes");
+    }
   };
 
   const handleResolveDispute = (disputeId: string) => {
+    const dispute = disputes.find((d) => d.id === disputeId);
+    if (!dispute) return;
+    const requestId = dispute.id.replace(/^D-/, "");
+
+    // optimistic UI
     setDisputes(disputes.map((d) => (d.id === disputeId ? { ...d, status: "Resolved" } : d)));
     toast.success("Dispute resolved");
+
+    // persist and notify parties
+    updateBorrowRequestStatus(requestId, "Resolved").catch((err) => {
+      console.error("Failed to persist resolved status:", err);
+      toast.error("Failed to save status");
+    });
+
+    // notify reporter and defendant
+    try {
+      createNotification({
+        userId: dispute.reporterId,
+        type: "system",
+        title: "Dispute Resolved",
+        message: "Your dispute has been resolved by our moderation team.",
+        referenceId: requestId,
+        referenceType: "borrowRequest",
+      });
+
+      createNotification({
+        userId: dispute.defendantId,
+        type: "system",
+        title: "Dispute Resolved",
+        message: "A dispute involving you has been resolved by our moderation team.",
+        referenceId: requestId,
+        referenceType: "borrowRequest",
+      });
+    } catch (e) {
+      // silent - errors already logged by createNotification
+    }
   };
 
   const handleEscalate = (disputeId: string) => {
+    const dispute = disputes.find((d) => d.id === disputeId);
+    if (!dispute) return;
+    const requestId = dispute.id.replace(/^D-/, "");
+
     setDisputes(disputes.map((d) => (d.id === disputeId ? { ...d, status: "Escalated" } : d)));
     toast.warning("Dispute escalated for further review");
+
+    updateBorrowRequestStatus(requestId, "Escalated").catch((err) => {
+      console.error("Failed to persist escalated status:", err);
+      toast.error("Failed to save status");
+    });
+
+    // notify both parties
+    try {
+      createNotification({
+        userId: dispute.reporterId,
+        type: "system",
+        title: "Dispute Escalated",
+        message: "Your dispute has been escalated to senior moderation for further review.",
+        referenceId: requestId,
+        referenceType: "borrowRequest",
+      });
+
+      createNotification({
+        userId: dispute.defendantId,
+        type: "system",
+        title: "Dispute Escalated",
+        message: "A dispute involving you has been escalated to senior moderation for further review.",
+        referenceId: requestId,
+        referenceType: "borrowRequest",
+      });
+    } catch (e) {}
+  };
+
+  const handleSetUnderReview = async (disputeId: string) => {
+    const dispute = disputes.find((d) => d.id === disputeId);
+    if (!dispute) return;
+    const requestId = dispute.id.replace(/^D-/, "");
+
+    setDisputes(disputes.map((d) => (d.id === disputeId ? { ...d, status: "Under Review" } : d)));
+    toast("Marked under review");
+
+    try {
+      await updateBorrowRequestStatus(requestId, "Under Review");
+      await createNotification({
+        userId: dispute.reporterId,
+        type: "system",
+        title: "Dispute Under Review",
+        message: "Your dispute is currently being reviewed by our moderation team. We may request additional information from you during the investigation process.",
+        referenceId: requestId,
+        referenceType: "borrowRequest",
+      });
+
+      await createNotification({
+        userId: dispute.defendantId,
+        type: "system",
+        title: "Dispute Under Review",
+        message: "Your dispute is currently being reviewed by our moderation team. We may request additional information from you during the investigation process.",
+        referenceId: requestId,
+        referenceType: "borrowRequest",
+      });
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update status");
+    }
+  };
+
+  const handleContactParties = async (disputeId: string) => {
+    const dispute = disputes.find((d) => d.id === disputeId);
+    if (!dispute) return;
+    const requestId = dispute.id.replace(/^D-/, "");
+
+    setDisputes(disputes.map((d) => (d.id === disputeId ? { ...d, status: "Contacted Parties" } : d)));
+    toast("Contacted parties");
+
+    try {
+      await updateBorrowRequestStatus(requestId, "Contacted Parties");
+      await createNotification({
+        userId: dispute.reporterId,
+        type: "system",
+        title: "We Contacted The Other Party",
+        message: "We have contacted the other party for a response regarding your dispute. We'll update you through your registered email address or phone number once they reply.",
+        referenceId: requestId,
+        referenceType: "borrowRequest",
+      });
+
+      await createNotification({
+        userId: dispute.defendantId,
+        type: "system",
+        title: "You Were Contacted About A Dispute",
+        message: "Your account is involved in an active dispute review. Our moderation team may contact you through your registered email address or phone number if additional clarification is required.",
+        referenceId: requestId,
+        referenceType: "borrowRequest",
+      });
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to contact parties");
+    }
+  };
+
+  const handleWaitingResponse = async (disputeId: string) => {
+    const dispute = disputes.find((d) => d.id === disputeId);
+    if (!dispute) return;
+    const requestId = dispute.id.replace(/^D-/, "");
+
+    setDisputes(disputes.map((d) => (d.id === disputeId ? { ...d, status: "Waiting Response" } : d)));
+    toast("Waiting for response");
+
+    try {
+      await updateBorrowRequestStatus(requestId, "Waiting Response");
+      await createNotification({
+        userId: dispute.reporterId,
+        type: "system",
+        title: "Awaiting Response",
+        message: "We're awaiting a response from the contacted party. We'll follow up and update once received.",
+        referenceId: requestId,
+        referenceType: "borrowRequest",
+      });
+
+      await createNotification({
+        userId: dispute.defendantId,
+        type: "system",
+        title: "Awaiting Your Response",
+        message: "Please respond to the moderation team's request for information regarding this dispute.",
+        referenceId: requestId,
+        referenceType: "borrowRequest",
+      });
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to set waiting response");
+    }
   };
 
   const getSeverityColor = (severity: string) => {
@@ -89,6 +291,14 @@ export default function DisputesPage() {
         return "bg-red-100 text-red-800 border-red-200";
       case "In Progress":
         return "bg-blue-100 text-blue-800 border-blue-200";
+      case "Under Review":
+        return "bg-indigo-100 text-indigo-800 border-indigo-200";
+      case "Contacted Parties":
+        return "bg-purple-100 text-purple-800 border-purple-200";
+      case "Waiting Response":
+        return "bg-amber-100 text-amber-800 border-amber-200";
+      case "Rejected":
+        return "bg-gray-100 text-gray-800 border-gray-200";
       case "Resolved":
         return "bg-green-100 text-green-800 border-green-200";
       case "Escalated":
@@ -126,10 +336,10 @@ export default function DisputesPage() {
 
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            {[
+              {[
               { label: "Total Disputes", value: disputes.length, icon: "⚖️", color: "from-red-500 to-red-600" },
               { label: "Open", value: disputes.filter((d) => d.status === "Open").length, icon: "🔴", color: "from-orange-500 to-orange-600" },
-              { label: "In Progress", value: disputes.filter((d) => d.status === "In Progress").length, icon: "⏳", color: "from-blue-500 to-blue-600" },
+              { label: "In Progress", value: disputes.filter((d) => IN_PROGRESS_STATUSES.includes(d.status)).length, icon: "⏳", color: "from-blue-500 to-blue-600" },
               { label: "Resolved", value: disputes.filter((d) => d.status === "Resolved").length, icon: "✅", color: "from-green-500 to-green-600" },
             ].map((stat, idx) => (
               <div key={idx} className={`p-4 rounded-lg bg-gradient-to-r ${stat.color} text-white shadow-lg hover:shadow-xl transition-all hover:scale-105`}>
@@ -222,8 +432,20 @@ export default function DisputesPage() {
                       {/* Admin Notes */}
                       {dispute.adminNotes && (
                         <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-                          <p className="text-xs font-semibold text-green-900 mb-1">Admin Resolution Notes:</p>
-                          <p className="text-sm text-green-800">{dispute.adminNotes}</p>
+                          <p className="text-xs font-semibold text-green-900 mb-2">Admin Resolution Notes:</p>
+                          <div className="space-y-2">
+                            {dispute.adminNotes.split("\n\n").map((part, i) => {
+                              const [ts, ...rest] = part.split("—");
+                              const text = rest.join("—").trim();
+                              const time = rest.length ? ts.trim() : "";
+                              return (
+                                <div key={i} className="text-sm text-green-800">
+                                  <div>{text || part}</div>
+                                  {time && <div className="text-xs text-green-900 font-medium">{time}</div>}
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -252,8 +474,8 @@ export default function DisputesPage() {
                           <Button
                             className="w-full bg-blue-600 hover:bg-blue-700"
                             onClick={() => {
-                              setSelectedDispute(dispute.id);
-                              setAdminNotes(dispute.adminNotes);
+                                setSelectedDispute(dispute.id);
+                                setAdminNotes("");
                             }}
                           >
                             <MessageSquare className="h-4 w-4 mr-2" />
@@ -297,10 +519,48 @@ export default function DisputesPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          {dispute.status !== "Under Review" && (
+                            <DropdownMenuItem onClick={() => handleSetUnderReview(dispute.id)}>
+                              <AlertTriangle className="h-4 w-4 mr-2" />
+                              Mark Under Review
+                            </DropdownMenuItem>
+                          )}
+                          {dispute.status !== "Contacted Parties" && (
+                            <DropdownMenuItem onClick={() => handleContactParties(dispute.id)}>
+                              <MessageSquare className="h-4 w-4 mr-2" />
+                              Contact Parties
+                            </DropdownMenuItem>
+                          )}
+                          {dispute.status !== "Waiting Response" && (
+                            <DropdownMenuItem onClick={() => handleWaitingResponse(dispute.id)}>
+                              <MessageSquare className="h-4 w-4 mr-2" />
+                              Waiting Response
+                            </DropdownMenuItem>
+                          )}
                           {dispute.status !== "Resolved" && (
                             <DropdownMenuItem onClick={() => handleResolveDispute(dispute.id)} className="text-green-600">
                               <CheckCircle className="h-4 w-4 mr-2" />
                               Mark Resolved
+                            </DropdownMenuItem>
+                          )}
+                          {dispute.status !== "Rejected" && (
+                            <DropdownMenuItem onClick={async () => {
+                              // mark rejected
+                              const id = dispute.id;
+                              setDisputes(prev => prev.map(d => d.id === id ? { ...d, status: 'Rejected' } : d));
+                              const requestId = dispute.id.replace(/^D-/, '');
+                              try {
+                                await updateBorrowRequestStatus(requestId, 'Rejected');
+                                await createNotification({ userId: dispute.reporterId, type: 'system', title: 'Dispute Rejected', message: 'Your dispute has been rejected by the moderation team.', referenceId: requestId, referenceType: 'borrowRequest' });
+                                await createNotification({ userId: dispute.defendantId, type: 'system', title: 'Dispute Rejected', message: 'A dispute involving you has been rejected by the moderation team.', referenceId: requestId, referenceType: 'borrowRequest' });
+                                toast('Marked rejected');
+                              } catch (err) {
+                                console.error(err);
+                                toast.error('Failed to mark rejected');
+                              }
+                            }} className="text-red-600">
+                              <AlertTriangle className="h-4 w-4 mr-2" />
+                              Reject
                             </DropdownMenuItem>
                           )}
                           {dispute.status !== "Escalated" && dispute.status !== "Resolved" && (
