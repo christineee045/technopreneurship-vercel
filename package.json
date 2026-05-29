@@ -3,6 +3,10 @@
   "private": true,
   "version": "0.0.1",
   "type": "module",
+  "workspaces": [
+    "apps/*",
+    "backend"
+  ],
   "scripts": {
     "dev": "npm --prefix apps/user run dev",
     "dev:backend": "npm --prefix backend run dev",
