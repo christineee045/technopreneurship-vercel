@@ -10,8 +10,8 @@
     "dev:proxy": "node proxy-server.js",
     "install:backend": "npm --prefix backend install",
     "start": "npm --prefix apps/user run start",
-    "build": "vite build",
-    "preview": "vite preview",
+    "build": "npm --prefix apps/user run build",
+    "preview": "npm --prefix apps/user run preview",
     "build:user": "npm --prefix apps/user run build",
     "build:admin": "npm --prefix apps/admin run build",
     "build:all": "npm run build:user && npm run build:admin"

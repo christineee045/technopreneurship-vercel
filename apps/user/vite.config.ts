@@ -11,4 +11,19 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['@radix-ui/react-slot'],
   },
+  build: {
+    rollupOptions: {
+      external: [
+        'fs',
+        'path',
+        'os',
+        'http',
+        'https',
+        'stream',
+        'crypto',
+        'canvas',
+        'fsevents'
+      ]
+    }
+  }
 })
