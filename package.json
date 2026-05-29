@@ -10,7 +10,10 @@
     "install:backend": "npm --prefix backend install",
     "start": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:user": "npm --prefix apps/user run build",
+    "build:admin": "npm --prefix apps/admin run build",
+    "build:all": "npm run build:user && npm run build:admin"
   },
   "dependencies": {
     "@emotion/react": "11.14.0",

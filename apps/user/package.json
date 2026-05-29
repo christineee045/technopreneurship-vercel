@@ -1,0 +1,8 @@
+{
+  "name": "apps-user-wrapper",
+  "private": true,
+  "scripts": {
+    "build": "npm --prefix \"../../\" ci && npm --prefix \"../../\" run build",
+    "dev": "npm --prefix \"../../\" run dev"
+  }
+}
