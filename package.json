@@ -4,11 +4,11 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "npm --prefix apps/user run dev",
     "dev:backend": "npm --prefix backend run dev",
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:backend\"",
     "install:backend": "npm --prefix backend install",
-    "start": "vite",
+    "start": "npm --prefix apps/user run start",
     "build": "vite build",
     "preview": "vite preview",
     "build:user": "npm --prefix apps/user run build",
