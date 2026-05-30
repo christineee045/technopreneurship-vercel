@@ -33,12 +33,15 @@ export const getUnreadCount = async (userId: string): Promise<number> => {
   return Notification.countDocuments({ userId, read: false });
 };
 
-export const markAsRead = async (notificationId: string, userId: string): Promise<INotification | null> => {
-  return Notification.findOneAndUpdate(
-    { _id: notificationId, userId },
-    { read: true },
-    { new: true }
-  );
+export const markAsRead = async (
+  notificationId: string,
+  userId: string,
+  isAdmin?: boolean
+): Promise<INotification | null> => {
+  const filter: any = { _id: notificationId };
+  if (!isAdmin) filter.userId = userId;
+
+  return Notification.findOneAndUpdate(filter, { read: true }, { new: true });
 };
 
 export const markAllAsRead = async (userId: string): Promise<number> => {
