@@ -1,4 +1,4 @@
-const VITE_API = (import.meta as any).env.VITE_API_URL ?? "http://localhost:5000";
+const VITE_API = (import.meta as any).env.VITE_API_URL;
 const API_BASE_URL = `${VITE_API}/api/admin`;
 const AUTH_BASE_URL = `${VITE_API}/api/auth`;
 const PUBLIC_API_BASE_URL = `${VITE_API}/api`;

@@ -39,7 +39,7 @@ export function AdminHeader({ onLogout }: AdminHeaderProps) {
   const [loadingNotifs, setLoadingNotifs] = useState(false);
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  const API_BASE = ((import.meta as any).env.VITE_API_URL ?? "http://localhost:5000") + "/api"; // public API base
+  const API_BASE = (import.meta as any).env.VITE_API_URL + "/api"; // public API base
   const ADMIN_TOKEN_KEY = "adminToken";
 
   const getAuthHeaders = (): Record<string, string> => {
