@@ -1,4 +1,5 @@
-const API_BASE_URL = "http://localhost:5000/api";
+const VITE_API = (import.meta as any).env.VITE_API_URL ?? "http://localhost:5000";
+const API_BASE_URL = `${VITE_API}/api`;
 
 const USER_TOKEN_KEY = "lendly_token";
 

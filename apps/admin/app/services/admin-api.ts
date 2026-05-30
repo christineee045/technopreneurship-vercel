@@ -1,6 +1,7 @@
-const API_BASE_URL = "http://localhost:5000/api/admin";
-const AUTH_BASE_URL = "http://localhost:5000/api/auth";
-const PUBLIC_API_BASE_URL = "http://localhost:5000/api";
+const VITE_API = (import.meta as any).env.VITE_API_URL ?? "http://localhost:5000";
+const API_BASE_URL = `${VITE_API}/api/admin`;
+const AUTH_BASE_URL = `${VITE_API}/api/auth`;
+const PUBLIC_API_BASE_URL = `${VITE_API}/api`;
 
 const ADMIN_TOKEN_KEY = "adminToken";
 
