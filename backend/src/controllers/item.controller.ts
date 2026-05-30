@@ -61,7 +61,9 @@ export const createItemHandler = async (req: Request, res: Response): Promise<vo
 
     res.status(201).json(item);
   } catch (error) {
-    res.status(500).json({ message: "Failed to create item", error });
+    console.error("createItemHandler error:", error);
+    const message = error instanceof Error ? error.message : String(error);
+    res.status(500).json({ message: "Failed to create item", error: message });
   }
 };
 
@@ -70,7 +72,9 @@ export const getItemsHandler = async (_req: Request, res: Response): Promise<voi
     const items = await getItems();
     res.json(items);
   } catch (error) {
-    res.status(500).json({ message: "Failed to fetch items", error });
+    console.error("getItemsHandler error:", error);
+    const message = error instanceof Error ? error.message : String(error);
+    res.status(500).json({ message: "Failed to fetch items", error: message });
   }
 };
 
@@ -79,7 +83,9 @@ export const getFeaturedItemsHandler = async (_req: Request, res: Response): Pro
     const items = await getFeaturedItems();
     res.json(items);
   } catch (error) {
-    res.status(500).json({ message: "Failed to fetch featured items", error });
+    console.error("getFeaturedItemsHandler error:", error);
+    const message = error instanceof Error ? error.message : String(error);
+    res.status(500).json({ message: "Failed to fetch featured items", error: message });
   }
 };
 
@@ -100,7 +106,9 @@ export const getItemByIdHandler = async (req: Request, res: Response): Promise<v
     }
     res.json(item);
   } catch (error) {
-    res.status(500).json({ message: "Failed to fetch item", error });
+    console.error("getItemByIdHandler error:", error);
+    const message = error instanceof Error ? error.message : String(error);
+    res.status(500).json({ message: "Failed to fetch item", error: message });
   }
 };
 
@@ -126,7 +134,9 @@ export const getItemsByOwnerIdHandler = async (req: Request, res: Response): Pro
     const items = await getItemsByOwnerId(publicOwnerId);
     res.json(items);
   } catch (error) {
-    res.status(500).json({ message: "Failed to fetch items", error });
+    console.error("getItemsByOwnerIdHandler error:", error);
+    const message = error instanceof Error ? error.message : String(error);
+    res.status(500).json({ message: "Failed to fetch items", error: message });
   }
 };
 
@@ -162,7 +172,9 @@ export const updateItemHandler = async (req: Request, res: Response): Promise<vo
     const item = await updateItem(itemId, updateData);
     res.json(item);
   } catch (error) {
-    res.status(500).json({ message: "Failed to update item", error });
+    console.error("updateItemHandler error:", error);
+    const message = error instanceof Error ? error.message : String(error);
+    res.status(500).json({ message: "Failed to update item", error: message });
   }
 };
 
@@ -201,6 +213,8 @@ export const deleteItemHandler = async (req: Request, res: Response): Promise<vo
       res.status(500).json({ message: "Failed to delete item" });
     }
   } catch (error) {
-    res.status(500).json({ message: "Failed to delete item", error });
+    console.error("deleteItemHandler error:", error);
+    const message = error instanceof Error ? error.message : String(error);
+    res.status(500).json({ message: "Failed to delete item", error: message });
   }
 };

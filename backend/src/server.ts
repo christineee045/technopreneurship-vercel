@@ -28,6 +28,11 @@ if (!process.env.JWT_SECRET) {
 connectDB();
 
 const app = express();
+// Basic request logging to surface requests in Render logs
+app.use((req, _res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
+  next();
+});
 
 app.use(cors());
 app.use(express.json({ limit: "25mb" }));
@@ -48,4 +53,13 @@ const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+});
+
+// Log unhandled promise rejections and uncaught exceptions so Render logs show them
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled Rejection:", reason);
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught Exception:", err);
 });
