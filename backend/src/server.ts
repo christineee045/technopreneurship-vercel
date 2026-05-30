@@ -43,7 +43,16 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 // Use '/*' to avoid path-to-regexp '*' parsing error on some platforms
-app.options("/*", cors(corsOptions));
+// Simple preflight handler that doesn't register a route (avoids path-to-regexp parsing)
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
+  res.header("Access-Control-Allow-Methods", "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept");
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204);
+  }
+  next();
+});
 app.use(express.json({ limit: "25mb" }));
 
 app.get("/", (req, res) => {
