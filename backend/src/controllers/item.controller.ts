@@ -70,6 +70,8 @@ export const createItemHandler = async (req: Request, res: Response): Promise<vo
 export const getItemsHandler = async (_req: Request, res: Response): Promise<void> => {
   try {
     const items = await getItems();
+    // Prevent client/proxy caching so responses reflect DB changes immediately
+    res.set("Cache-Control", "no-cache, no-store, must-revalidate");
     res.json(items);
   } catch (error) {
     console.error("getItemsHandler error:", error);
@@ -81,6 +83,8 @@ export const getItemsHandler = async (_req: Request, res: Response): Promise<voi
 export const getFeaturedItemsHandler = async (_req: Request, res: Response): Promise<void> => {
   try {
     const items = await getFeaturedItems();
+    // Prevent client/proxy caching so responses reflect DB changes immediately
+    res.set("Cache-Control", "no-cache, no-store, must-revalidate");
     res.json(items);
   } catch (error) {
     console.error("getFeaturedItemsHandler error:", error);
@@ -104,6 +108,8 @@ export const getItemByIdHandler = async (req: Request, res: Response): Promise<v
       res.status(404).json({ message: "Item not found" });
       return;
     }
+    // Prevent client/proxy caching so responses reflect DB changes immediately
+    res.set("Cache-Control", "no-cache, no-store, must-revalidate");
     res.json(item);
   } catch (error) {
     console.error("getItemByIdHandler error:", error);
@@ -118,6 +124,8 @@ export const getItemsByOwnerIdHandler = async (req: Request, res: Response): Pro
     const userId = (req as any).user?.id;
     if (userId) {
       const items = await getItemsByOwnerId(userId);
+      // Prevent client/proxy caching for owner-specific lists
+      res.set("Cache-Control", "no-cache, no-store, must-revalidate");
       res.json(items);
       return;
     }
@@ -132,6 +140,8 @@ export const getItemsByOwnerIdHandler = async (req: Request, res: Response): Pro
     }
 
     const items = await getItemsByOwnerId(publicOwnerId);
+    // Prevent client/proxy caching for owner-specific lists
+    res.set("Cache-Control", "no-cache, no-store, must-revalidate");
     res.json(items);
   } catch (error) {
     console.error("getItemsByOwnerIdHandler error:", error);
