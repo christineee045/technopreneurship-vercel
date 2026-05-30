@@ -85,7 +85,7 @@ export const markAsReadHandler = async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    const notification = await markAsRead(notificationId, user.id, Boolean(user.isAdmin));
+    const notification = await (markAsRead as any)(notificationId, user.id, Boolean(user.isAdmin));
     if (!notification) {
       res.status(404).json({ message: "Notification not found" });
       return;

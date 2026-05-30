@@ -98,10 +98,13 @@ export const getAllReviews = async (): Promise<Array<IReview & { category?: stri
   const categoryByItemId = new Map(items.map((item: any) => [item._id.toString(), item.category || ""]));
   const withAvatars = await populateReviewAvatars(reviews);
 
-  return withAvatars.map((review: any) => ({
-    ...review,
-    category: categoryByItemId.get(review.itemId) || "",
-  })) as Array<IReview & { category?: string }>;
+  return withAvatars.map((review: any) => {
+    const plain = typeof review.toObject === "function" ? review.toObject() : review;
+    return {
+      ...plain,
+      category: categoryByItemId.get(plain.itemId) || "",
+    } as IReview & { category?: string };
+  });
 };
 
 export const replyToReview = async (
