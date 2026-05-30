@@ -6,7 +6,7 @@ const API_BASE_URL = `${VITE_API}/api`;
 
 const USER_TOKEN_KEY = "lendly_token";
 
-const getAuthHeaders = () => {
+const getAuthHeaders = (): Record<string, string> => {
   const token = localStorage.getItem(USER_TOKEN_KEY);
 
   if (!token) {
@@ -18,7 +18,7 @@ const getAuthHeaders = () => {
   };
 };
 
-const getJsonHeaders = () => ({
+const getJsonHeaders = (): Record<string, string> => ({
   "Content-Type": "application/json",
   ...getAuthHeaders(),
 });

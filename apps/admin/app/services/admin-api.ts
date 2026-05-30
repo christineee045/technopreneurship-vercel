@@ -17,7 +17,7 @@ let dashboardCache: {
 let dashboardCacheTime = 0;
 const DASHBOARD_CACHE_TTL = 60000; // 60 seconds
 
-const getAuthHeaders = () => {
+const getAuthHeaders = (): Record<string, string> => {
   const token = localStorage.getItem(ADMIN_TOKEN_KEY);
 
   if (!token) {
@@ -29,7 +29,7 @@ const getAuthHeaders = () => {
   };
 };
 
-const getJsonHeaders = () => ({
+const getJsonHeaders = (): Record<string, string> => ({
   "Content-Type": "application/json",
   ...getAuthHeaders(),
 });
