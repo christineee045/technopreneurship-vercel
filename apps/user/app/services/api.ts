@@ -1,4 +1,7 @@
-const VITE_API = (import.meta as any).env.VITE_API_URL;
+const _RAW_VITE_API = (import.meta as any).env.VITE_API_URL || "";
+const VITE_API = (_RAW_VITE_API.startsWith("http://") || _RAW_VITE_API.startsWith("https://"))
+  ? _RAW_VITE_API.replace(/\/$/, "")
+  : `https://${_RAW_VITE_API.replace(/\/$/, "")}`;
 const API_BASE_URL = `${VITE_API}/api`;
 
 const USER_TOKEN_KEY = "lendly_token";

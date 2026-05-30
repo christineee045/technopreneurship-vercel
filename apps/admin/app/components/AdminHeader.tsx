@@ -39,7 +39,11 @@ export function AdminHeader({ onLogout }: AdminHeaderProps) {
   const [loadingNotifs, setLoadingNotifs] = useState(false);
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  const API_BASE = (import.meta as any).env.VITE_API_URL + "/api"; // public API base
+  const _RAW_VITE_API = (import.meta as any).env.VITE_API_URL || "";
+  const VITE_API = (_RAW_VITE_API.startsWith("http://") || _RAW_VITE_API.startsWith("https://"))
+    ? _RAW_VITE_API.replace(/\/$/, "")
+    : `https://${_RAW_VITE_API.replace(/\/$/, "")}`;
+  const API_BASE = VITE_API + "/api"; // public API base
   const ADMIN_TOKEN_KEY = "adminToken";
 
   const getAuthHeaders = (): Record<string, string> => {
