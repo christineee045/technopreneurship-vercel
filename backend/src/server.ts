@@ -42,7 +42,8 @@ const corsOptions = {
   credentials: true,
 };
 app.use(cors(corsOptions));
-app.options("*", cors(corsOptions));
+// Use '/*' to avoid path-to-regexp '*' parsing error on some platforms
+app.options("/*", cors(corsOptions));
 app.use(express.json({ limit: "25mb" }));
 
 app.get("/", (req, res) => {
