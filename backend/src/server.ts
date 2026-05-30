@@ -34,7 +34,15 @@ app.use((req, _res, next) => {
   next();
 });
 
-app.use(cors());
+// Explicit CORS config to ensure Authorization and other headers are allowed
+const corsOptions = {
+  origin: true,
+  methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "Accept"],
+  credentials: true,
+};
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 app.use(express.json({ limit: "25mb" }));
 
 app.get("/", (req, res) => {
